@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bộ Đề - Ứng dụng luyện quiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <!-- ===== HEADER ===== -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">B.Đ</span>
+      <span class="brand-name" id="brandSubject">Bộ Đề</span>
+    </div>
+    <div class="topbar-stats" id="topbarStats" hidden>
+      <span class="stat"><span class="stat-num" id="statScore">0</span><span class="stat-label">đúng</span></span>
+      <span class="stat-sep">/</span>
+      <span class="stat"><span class="stat-num" id="statSeen">0</span><span class="stat-label">đã làm</span></span>
+    </div>
+    <button class="btn-ghost" id="btnLibrary" hidden>Đổi môn</button>
+  </header>
+
+  <!-- ===== SCREEN: LIBRARY (danh sách môn học) ===== -->
+  <section class="screen" id="screenLibrary">
+    <div class="setup-wrap">
+      <h1 class="setup-title">Chọn môn học<br>để bắt đầu luyện tập</h1>
+      <p class="setup-sub">Mỗi môn lưu tiến trình và ghi chú riêng. Sai câu nào, vòng sau ôn lại đúng câu đó đến khi làm đúng hết.</p>
+
+      <div class="subject-list" id="subjectList"></div>
+
+      <label class="btn-upload btn-upload-block" for="fileInput">+ Thêm môn học mới (tải file JSON)
+        <input type="file" id="fileInput" accept="application/json,.json" hidden>
+      </label>
+      <p class="setup-error" id="setupError" hidden></p>
+    </div>
+  </section>
+
+  <!-- ===== SCREEN: CONFIG (thiết lập phiên học cho 1 môn) ===== -->
+  <section class="screen" id="screenConfig" hidden>
+    <div class="setup-wrap">
+      <button class="btn-ghost btn-back" id="btnBackToLibrary">← Danh sách môn</button>
+      <h1 class="setup-title" id="configTitle">Tên môn</h1>
+      <p class="setup-sub" id="configSub">— câu hỏi</p>
+
+      <div class="setup-row">
+        <div class="field">
+          <label class="field-label">Chương / chủ đề</label>
+          <select id="categorySelect" class="field-control"></select>
+        </div>
+        <div class="field">
+          <label class="field-label">Số câu</label>
+          <select id="countSelect" class="field-control">
+            <option value="10">10 câu</option>
+            <option value="20" selected>20 câu</option>
+            <option value="50">50 câu</option>
+            <option value="100">100 câu</option>
+            <option value="all">Tất cả</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">Chế độ</label>
+          <select id="modeSelect" class="field-control">
+            <option value="shuffle" selected>Xáo trộn</option>
+            <option value="order">Theo thứ tự</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn-primary btn-start" id="btnStart">Bắt đầu vòng 1</button>
+
+      <div class="setup-resume" id="setupResume" hidden>
+        <p id="resumeProgress"></p>
+        <button class="btn-secondary" id="btnResume">Tiếp tục phiên trước</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SCREEN: QUIZ ===== -->
+  <section class="screen" id="screenQuiz" hidden>
+    <div class="quiz-wrap">
+
+      <div class="round-badge" id="roundBadge">Vòng 1</div>
+
+      <div class="quiz-meta">
+        <span class="quiz-index"><span id="quizCurrent">1</span> / <span id="quizTotal">20</span></span>
+        <span class="quiz-cat" id="quizCat"></span>
+      </div>
+
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+
+      <div class="deck">
+        <div class="deck-shadow deck-shadow-3"></div>
+        <div class="deck-shadow deck-shadow-2"></div>
+        <div class="deck-shadow deck-shadow-1"></div>
+        <div class="card" id="card">
+          <p class="card-question" id="cardQuestion">Câu hỏi sẽ hiện ở đây</p>
+          <div class="card-options" id="cardOptions"></div>
+
+          <div class="note-box" id="noteBox" hidden>
+            <div class="note-display" id="noteDisplay" hidden>
+              <p class="note-label">Giải thích</p>
+              <p class="note-text" id="noteText"></p>
+              <button class="note-link" id="btnEditNote">Sửa</button>
+            </div>
+            <button class="note-add" id="btnAddNote" hidden>+ Thêm giải thích</button>
+            <div class="note-edit" id="noteEdit" hidden>
+              <textarea class="note-textarea" id="noteTextarea" rows="3" placeholder="Ghi giải thích của bạn cho câu này..."></textarea>
+              <div class="note-edit-actions">
+                <button class="btn-secondary btn-sm" id="btnCancelNote">Huỷ</button>
+                <button class="btn-primary btn-sm" id="btnSaveNote">Lưu giải thích</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="quiz-controls">
+        <button class="btn-secondary" id="btnSkip">Bỏ qua</button>
+        <button class="btn-primary" id="btnNext" disabled>Câu tiếp theo</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SCREEN: ROUND COMPLETE (chuyển vòng) ===== -->
+  <section class="screen" id="screenRoundComplete" hidden>
+    <div class="result-wrap">
+      <p class="result-eyebrow" id="roundDoneEyebrow">Xong vòng 1</p>
+      <h1 class="result-score" id="roundDoneScore">8/10</h1>
+      <p class="result-sub" id="roundDoneSub">2 câu sai sẽ được hỏi lại ở vòng sau.</p>
+      <div class="result-actions">
+        <button class="btn-primary" id="btnNextRound">Vào vòng tiếp theo</button>
+        <button class="btn-secondary" id="btnStopHere">Dừng ở đây</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SCREEN: RESULT (hoàn thành, đúng hết) ===== -->
+  <section class="screen" id="screenResult" hidden>
+    <div class="result-wrap">
+      <p class="result-eyebrow">Đã thuộc hết bộ này 🎉</p>
+      <h1 class="result-score" id="resultScore">10/10</h1>
+      <p class="result-sub" id="resultSub"></p>
+
+      <div class="result-actions">
+        <button class="btn-primary" id="btnRetrySame">Làm lại bộ này</button>
+        <button class="btn-secondary" id="btnRestart">Học môn khác</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
