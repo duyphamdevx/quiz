@@ -8,6 +8,11 @@
 - **Học theo vòng, lặp đến khi đúng hết**: vòng 1 làm hết các câu đã chọn; câu nào sai, vòng 2 sẽ chỉ hỏi lại đúng những câu đó; cứ thế đến khi một vòng không còn câu sai nào — coi như đã thuộc bộ đó. Điểm cuối cùng hiển thị là điểm **lần làm đầu tiên** (vòng 1) và số vòng cần để thuộc hết.
 - **Giải thích tự lưu**: sau khi trả lời mỗi câu, có nút "+ Thêm giải thích" — gõ ghi chú của riêng bạn, bấm Lưu. Ghi chú này lưu vào trình duyệt và sẽ hiện lại y nguyên ở những lần học sau, kể cả sau khi tắt trình duyệt.
 - Tự lưu phiên đang học dở (kể cả đang ở giữa vòng) — quay lại là có nút "Tiếp tục phiên trước" hoặc "Đang học dở — vòng X" ngay trên thẻ môn học.
+- Bấm phím số (1, 2, 3…) để chọn đáp án, Enter để qua câu tiếp theo.
+- **Thống kê câu hay sai (luỹ kế)**: mỗi môn có nút "Xem thống kê câu hay sai" — liệt kê các câu bạn từng làm sai, xếp theo số lần sai nhiều nhất, tính gộp qua **mọi lần học** chứ không chỉ phiên hiện tại.
+- **Thanh động lực**: trên màn hình danh sách môn, hiện số ngày học liên tiếp (streak), độ chính xác chung và tổng số câu đã học luỹ kế trên toàn bộ các môn.
+- **Xuất / nhập dữ liệu**: nút "Xuất dữ liệu" tải về 1 file JSON chứa toàn bộ môn học, tiến trình, ghi chú, thống kê — dùng để sao lưu hoặc chuyển sang máy khác. Nút "Nhập dữ liệu" đọc lại file đó (sẽ ghi đè dữ liệu hiện có trên trình duyệt).
+- **Chế độ thi thử giới hạn giờ**: ở màn hình cấu hình, chọn "Kiểu học" = "Thi thử", chọn số câu và thời gian (phút). Làm hết câu hoặc hết giờ là nộp bài tự động. App tự ưu tiên chọn những câu **chưa** xuất hiện ở lần thi thử gần nhất trong cùng môn — nghĩa là tối đa 20% câu có thể trùng với lần thi trước (chỉ trùng khi bộ đề không còn đủ câu mới).
 
 ## 1. Đưa lên GitHub Pages
 

@@ -5,8 +5,11 @@
   const subjectDataKey = (id) => `boDeQuiz.subject.${id}`;
   const notesKey = (id) => `boDeQuiz.notes.${id}`;
   const sessionKey = (id) => `boDeQuiz.session.${id}`;
+  const statsKey = (id) => `boDeQuiz.stats.${id}`;      // cumulative correct/wrong per question
+  const examKey = (id) => `boDeQuiz.exam.${id}`;        // last exam question ids + exam history
+  const ACTIVITY_KEY = "boDeQuiz.activity.v1";          // daily study log, for streak/accuracy
 
-  const LETTERS = "ABCDEFGHIJ".split("");
+  // (option markers use digit numbers 1-9 so they map directly to keyboard shortcuts)
 
   // ---------- State ----------
   let library = [];          // [{id, name, count, addedAt}]
@@ -23,14 +26,22 @@
 
     screenLibrary: $("screenLibrary"), subjectList: $("subjectList"),
     fileInput: $("fileInput"), setupError: $("setupError"),
+    motivationBar: $("motivationBar"), motStreak: $("motStreak"), motAccuracy: $("motAccuracy"), motTotal: $("motTotal"),
+    btnExportData: $("btnExportData"), importFileInput: $("importFileInput"),
 
     screenConfig: $("screenConfig"), btnBackToLibrary: $("btnBackToLibrary"),
     configTitle: $("configTitle"), configSub: $("configSub"),
+    studyTypeSelect: $("studyTypeSelect"),
     categorySelect: $("categorySelect"), countSelect: $("countSelect"), modeSelect: $("modeSelect"),
-    btnStart: $("btnStart"),
+    modeField: $("modeField"), timeLimitField: $("timeLimitField"), timeLimitSelect: $("timeLimitSelect"),
+    setupExamHint: $("setupExamHint"),
+    btnStart: $("btnStart"), btnViewStats: $("btnViewStats"),
     setupResume: $("setupResume"), resumeProgress: $("resumeProgress"), btnResume: $("btnResume"),
 
-    screenQuiz: $("screenQuiz"), roundBadge: $("roundBadge"),
+    screenStats: $("screenStats"), btnBackFromStats: $("btnBackFromStats"),
+    statsSubtitle: $("statsSubtitle"), statsList: $("statsList"),
+
+    screenQuiz: $("screenQuiz"), roundBadge: $("roundBadge"), examTimer: $("examTimer"),
     quizCurrent: $("quizCurrent"), quizTotal: $("quizTotal"), quizCat: $("quizCat"),
     progressFill: $("progressFill"),
     cardQuestion: $("cardQuestion"), cardOptions: $("cardOptions"),
@@ -43,6 +54,11 @@
     screenRoundComplete: $("screenRoundComplete"), roundDoneEyebrow: $("roundDoneEyebrow"),
     roundDoneScore: $("roundDoneScore"), roundDoneSub: $("roundDoneSub"),
     btnNextRound: $("btnNextRound"), btnStopHere: $("btnStopHere"),
+
+    screenExamResult: $("screenExamResult"), examResultEyebrow: $("examResultEyebrow"),
+    examResultScore: $("examResultScore"), examResultSub: $("examResultSub"),
+    btnExamRetry: $("btnExamRetry"), btnExamBackToLibrary: $("btnExamBackToLibrary"),
+    examReviewList: $("examReviewList"),
 
     screenResult: $("screenResult"), resultScore: $("resultScore"), resultSub: $("resultSub"),
     btnRetrySame: $("btnRetrySame"), btnRestart: $("btnRestart"),
@@ -124,6 +140,8 @@
     safeRemove(subjectDataKey(id));
     safeRemove(notesKey(id));
     safeRemove(sessionKey(id));
+    safeRemove(statsKey(id));
+    safeRemove(examKey(id));
   }
 
   function getSubjectQuestions(id) {
@@ -162,12 +180,57 @@
   }
   function clearSession() { if (subject) safeRemove(sessionKey(subject.id)); }
 
+  // ---------- Cumulative wrong/correct stats persistence ----------
+  function loadStats(id) {
+    try { return JSON.parse(safeGet(statsKey(id)) || "{}"); } catch (e) { return {}; }
+  }
+  function recordStat(id, qId, wasCorrect) {
+    const store = loadStats(id);
+    if (!store[qId]) store[qId] = { correct: 0, wrong: 0 };
+    if (wasCorrect) store[qId].correct++; else store[qId].wrong++;
+    safeSet(statsKey(id), JSON.stringify(store));
+  }
+
+  // ---------- Exam data persistence (last exam question ids + history) ----------
+  function loadExamData(id) {
+    try { return JSON.parse(safeGet(examKey(id)) || "{}"); } catch (e) { return {}; }
+  }
+  function saveExamData(id, data) { safeSet(examKey(id), JSON.stringify(data)); }
+
+  // ---------- Daily activity log (for streak + overall accuracy) ----------
+  function fmtDate(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  function loadActivity() {
+    try { return JSON.parse(safeGet(ACTIVITY_KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function recordActivity(wasCorrect) {
+    const activity = loadActivity();
+    const key = fmtDate(new Date());
+    if (!activity[key]) activity[key] = { answered: 0, correct: 0 };
+    activity[key].answered++;
+    if (wasCorrect) activity[key].correct++;
+    safeSet(ACTIVITY_KEY, JSON.stringify(activity));
+  }
+  function computeStreak(activity) {
+    const daySet = new Set(Object.keys(activity).filter((d) => activity[d].answered > 0));
+    if (daySet.size === 0) return 0;
+    const cursor = new Date();
+    if (!daySet.has(fmtDate(cursor))) cursor.setDate(cursor.getDate() - 1); // today not studied yet — check from yesterday
+    let streak = 0;
+    while (daySet.has(fmtDate(cursor))) { streak++; cursor.setDate(cursor.getDate() - 1); }
+    return streak;
+  }
+
   // ---------- Screens ----------
   function showScreen(name) {
+    if (name !== "quiz") stopExamTimer();
     el.screenLibrary.hidden = name !== "library";
     el.screenConfig.hidden = name !== "config";
+    el.screenStats.hidden = name !== "stats";
     el.screenQuiz.hidden = name !== "quiz";
     el.screenRoundComplete.hidden = name !== "roundComplete";
+    el.screenExamResult.hidden = name !== "examResult";
     el.screenResult.hidden = name !== "result";
     el.topbarStats.hidden = name !== "quiz";
     el.btnLibrary.hidden = name === "library";
@@ -175,7 +238,26 @@
   }
 
   // ---------- LIBRARY screen ----------
+  function renderMotivation() {
+    const activity = loadActivity();
+    const streak = computeStreak(activity);
+    let totalCorrect = 0, totalAnswered = 0;
+    for (const s of library) {
+      const stats = loadStats(s.id);
+      for (const k in stats) {
+        totalCorrect += stats[k].correct || 0;
+        totalAnswered += (stats[k].correct || 0) + (stats[k].wrong || 0);
+      }
+    }
+    if (totalAnswered === 0 && streak === 0) { el.motivationBar.hidden = true; return; }
+    el.motivationBar.hidden = false;
+    el.motStreak.textContent = streak;
+    el.motAccuracy.textContent = totalAnswered ? `${Math.round((totalCorrect / totalAnswered) * 100)}%` : "0%";
+    el.motTotal.textContent = totalAnswered;
+  }
+
   function renderLibrary() {
+    renderMotivation();
     if (library.length === 0) {
       el.subjectList.innerHTML = `<p class="setup-sub" style="margin:0 0 4px;">Chưa có môn nào — tải lên một file JSON câu hỏi để bắt đầu.</p>`;
       return;
@@ -183,6 +265,9 @@
     el.subjectList.innerHTML = "";
     for (const s of library) {
       const savedSess = loadSession(s.id);
+      const stats = loadStats(s.id);
+      let wrongCount = 0;
+      for (const k in stats) if (stats[k].wrong > 0) wrongCount++;
       const card = document.createElement("div");
       card.className = "subject-card";
       card.innerHTML = `
@@ -190,6 +275,7 @@
           <p class="subject-card-name">${escapeHtml(s.name)}</p>
           <div class="subject-card-meta">
             <span>${s.count} câu</span>
+            ${wrongCount > 0 ? `<span class="subject-card-progress" style="color:var(--bad)">${wrongCount} câu hay sai</span>` : ""}
             ${savedSess ? `<span class="subject-card-progress">Đang học dở — vòng ${savedSess.round}</span>` : ""}
           </div>
         </div>
@@ -206,6 +292,67 @@
       el.subjectList.appendChild(card);
     }
   }
+
+  // ---------- Export / Import backup ----------
+  function exportData() {
+    const payload = {
+      version: 1, exportedAt: new Date().toISOString(),
+      library, subjects: {}, notes: {}, sessions: {}, stats: {}, examData: {},
+      activity: loadActivity(),
+    };
+    for (const s of library) {
+      payload.subjects[s.id] = getSubjectQuestions(s.id);
+      payload.notes[s.id] = loadNotes(s.id);
+      payload.sessions[s.id] = loadSession(s.id);
+      payload.stats[s.id] = loadStats(s.id);
+      payload.examData[s.id] = loadExamData(s.id);
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bo-de-backup-${fmtDate(new Date())}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function importData(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const payload = JSON.parse(reader.result);
+        if (!payload || !Array.isArray(payload.library)) throw new Error("File backup không đúng định dạng.");
+        if (!confirm("Nhập dữ liệu sẽ GHI ĐÈ toàn bộ môn học, tiến trình, ghi chú và thống kê hiện có trên trình duyệt này. Tiếp tục?")) return;
+        library = payload.library;
+        saveLibrary();
+        for (const s of library) {
+          safeSet(subjectDataKey(s.id), JSON.stringify(payload.subjects?.[s.id] || []));
+          safeSet(notesKey(s.id), JSON.stringify(payload.notes?.[s.id] || {}));
+          if (payload.sessions?.[s.id]) safeSet(sessionKey(s.id), JSON.stringify(payload.sessions[s.id]));
+          else safeRemove(sessionKey(s.id));
+          safeSet(statsKey(s.id), JSON.stringify(payload.stats?.[s.id] || {}));
+          safeSet(examKey(s.id), JSON.stringify(payload.examData?.[s.id] || {}));
+        }
+        safeSet(ACTIVITY_KEY, JSON.stringify(payload.activity || {}));
+        setError("");
+        renderLibrary();
+        alert("Đã nhập dữ liệu thành công.");
+      } catch (err) {
+        setError("Không nhập được file: " + err.message);
+      }
+    };
+    reader.onerror = () => setError("Không đọc được file.");
+    reader.readAsText(file);
+  }
+
+  el.btnExportData.addEventListener("click", exportData);
+  el.importFileInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file) importData(file);
+    el.importFileInput.value = "";
+  });
 
   el.fileInput.addEventListener("change", (e) => {
     const file = e.target.files[0];
@@ -233,6 +380,18 @@
   el.btnLibrary.addEventListener("click", () => { showScreen("library"); renderLibrary(); });
 
   // ---------- CONFIG screen ----------
+  let lastStudyType = "practice";
+
+  function applyStudyTypeUI() {
+    const isExam = el.studyTypeSelect.value === "exam";
+    el.timeLimitField.hidden = !isExam;
+    el.modeField.hidden = isExam; // exam is always shuffled
+    el.setupExamHint.hidden = !isExam;
+    el.btnStart.textContent = isExam ? "Bắt đầu thi thử" : "Bắt đầu vòng 1";
+    lastStudyType = el.studyTypeSelect.value;
+  }
+  el.studyTypeSelect.addEventListener("change", applyStudyTypeUI);
+
   function openConfig(id) {
     const questions = getSubjectQuestions(id);
     const meta = library.find((s) => s.id === id);
@@ -246,12 +405,15 @@
     el.categorySelect.innerHTML = ['<option value="__all__">Tất cả chương</option>']
       .concat(cats.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)).join("");
 
+    el.studyTypeSelect.value = lastStudyType;
+    applyStudyTypeUI();
+
     const savedSess = loadSession(id);
     if (savedSess) {
       el.setupResume.hidden = false;
       const doneInRound = savedSess.pos;
       el.resumeProgress.textContent = `Vòng ${savedSess.round} — câu ${doneInRound + 1}/${savedSess.currentRoundOrder.length}`;
-      el.btnResume.onclick = () => { sess = savedSess; showScreen("quiz"); renderQuestion(); };
+      el.btnResume.onclick = () => { sess = savedSess; showScreen("quiz"); renderQuestion(); startExamTimerIfNeeded(); };
     } else {
       el.setupResume.hidden = true;
     }
@@ -259,30 +421,93 @@
     showScreen("config");
   }
 
-  el.btnStart.addEventListener("click", () => {
-    const category = el.categorySelect.value;
-    const mode = el.modeSelect.value;
+  function buildPool(category) {
     let pool = subject.questions.map((_, i) => i);
     if (category !== "__all__") pool = pool.filter((i) => subject.questions[i].category === category);
+    return pool;
+  }
+
+  el.btnViewStats.addEventListener("click", () => { renderSubjectStats(); showScreen("stats"); });
+  el.btnBackFromStats.addEventListener("click", () => showScreen("config"));
+
+  el.btnStart.addEventListener("click", () => {
+    const category = el.categorySelect.value;
+    const pool = buildPool(category);
     if (pool.length === 0) { setError("Chương này không có câu hỏi."); return; }
+    setError("");
 
     const countSel = el.countSelect.value;
-    let originalSet = mode === "shuffle" ? shuffle(pool) : pool.slice();
-    const n = countSel === "all" ? originalSet.length : Math.min(parseInt(countSel, 10), originalSet.length);
-    originalSet = originalSet.slice(0, n);
+    const isExam = el.studyTypeSelect.value === "exam";
 
-    sess = {
-      category, mode, round: 1,
-      currentRoundOrder: originalSet,
-      pos: 0,
-      roundWrong: [],
-      firstRoundCorrectCount: 0,
-      originalSetLength: originalSet.length,
-    };
+    if (isExam) {
+      const desired = countSel === "all" ? pool.length : Math.min(parseInt(countSel, 10), pool.length);
+      const examData = loadExamData(subject.id);
+      const lastIds = new Set(examData.lastQuestionIds || []);
+      const freshIdx = shuffle(pool.filter((i) => !lastIds.has(subject.questions[i].id)));
+      const repeatIdx = shuffle(pool.filter((i) => lastIds.has(subject.questions[i].id)));
+      const examSet = freshIdx.length >= desired
+        ? freshIdx.slice(0, desired)
+        : freshIdx.concat(repeatIdx).slice(0, desired);
+
+      const timeLimitMin = parseInt(el.timeLimitSelect.value, 10);
+      sess = {
+        examMode: true, category, mode: "shuffle", round: 1,
+        currentRoundOrder: examSet,
+        pos: 0,
+        roundWrong: [],
+        firstRoundCorrectCount: 0,
+        originalSetLength: examSet.length,
+        timeLimitSec: timeLimitMin * 60,
+        examDeadline: Date.now() + timeLimitMin * 60 * 1000,
+      };
+    } else {
+      const mode = el.modeSelect.value;
+      let originalSet = mode === "shuffle" ? shuffle(pool) : pool.slice();
+      const n = countSel === "all" ? originalSet.length : Math.min(parseInt(countSel, 10), originalSet.length);
+      originalSet = originalSet.slice(0, n);
+
+      sess = {
+        examMode: false, category, mode, round: 1,
+        currentRoundOrder: originalSet,
+        pos: 0,
+        roundWrong: [],
+        firstRoundCorrectCount: 0,
+        originalSetLength: originalSet.length,
+      };
+    }
+
     saveSession();
     showScreen("quiz");
     renderQuestion();
+    startExamTimerIfNeeded();
   });
+
+  // ---------- Subject stats screen (câu hay sai luỹ kế) ----------
+  function renderSubjectStats() {
+    const stats = loadStats(subject.id);
+    const rows = subject.questions
+      .map((q) => ({ q, wrong: stats[q.id]?.wrong || 0, correct: stats[q.id]?.correct || 0 }))
+      .filter((r) => r.wrong > 0)
+      .sort((a, b) => b.wrong - a.wrong)
+      .slice(0, 200);
+
+    el.statsSubtitle.textContent = rows.length
+      ? `${subject.name} — ${rows.length} câu từng làm sai, xếp theo số lần sai nhiều nhất (tính luỹ kế qua mọi lần học).`
+      : `${subject.name} — chưa có câu nào bị làm sai. Cứ học tiếp nhé!`;
+
+    el.statsList.innerHTML = "";
+    for (const r of rows) {
+      const noteTxt = notes[r.q.id] || r.q.explanation || "";
+      const item = document.createElement("div");
+      item.className = "review-item";
+      item.innerHTML = `
+        <p class="review-q">${escapeHtml(r.q.question)}</p>
+        <p class="review-your">Sai ${r.wrong} lần · đúng ${r.correct} lần</p>
+        ${noteTxt ? `<p class="review-correct" style="color:var(--paper-muted)">${escapeHtml(noteTxt)}</p>` : ""}
+      `;
+      el.statsList.appendChild(item);
+    }
+  }
 
   // ---------- QUIZ screen ----------
   function currentQuestion() { return subject.questions[sess.currentRoundOrder[sess.pos]]; }
@@ -291,7 +516,8 @@
     const q = currentQuestion();
     const total = sess.currentRoundOrder.length;
 
-    el.roundBadge.textContent = `Vòng ${sess.round}`;
+    el.roundBadge.textContent = sess.examMode ? "⏱ Thi thử" : `Vòng ${sess.round}`;
+    el.examTimer.hidden = !sess.examMode;
     el.quizCurrent.textContent = sess.pos + 1;
     el.quizTotal.textContent = total;
     el.quizCat.textContent = q.category;
@@ -314,7 +540,7 @@
       const btn = document.createElement("button");
       btn.className = "option";
       btn.type = "button";
-      btn.innerHTML = `<span class="option-letter">${LETTERS[i] || i + 1}</span><span>${escapeHtml(optText)}</span>`;
+      btn.innerHTML = `<span class="option-letter">${i + 1}</span><span>${escapeHtml(optText)}</span>`;
       btn.addEventListener("click", () => handleAnswer(i, correctSet, q));
       el.cardOptions.appendChild(btn);
     });
@@ -339,6 +565,9 @@
       sess.roundWrong.push(sess.currentRoundOrder[sess.pos]);
     }
 
+    recordStat(subject.id, q.id, wasCorrect);
+    recordActivity(wasCorrect);
+
     el.statScore.textContent = (sess.pos + 1) - sess.roundWrong.length;
     el.statSeen.textContent = sess.pos + 1;
     el.btnNext.disabled = false;
@@ -350,7 +579,10 @@
   function skipQuestion() {
     const optionBtns = Array.from(el.cardOptions.children);
     if (!optionBtns[0] || !optionBtns[0].disabled) {
+      const q = currentQuestion();
       sess.roundWrong.push(sess.currentRoundOrder[sess.pos]);
+      recordStat(subject.id, q.id, false);
+      recordActivity(false);
     }
     advance();
   }
@@ -362,11 +594,51 @@
     sess.pos++;
     if (sess.pos < sess.currentRoundOrder.length) {
       renderQuestion();
+    } else if (sess.examMode) {
+      finishExam(false);
     } else if (sess.roundWrong.length === 0) {
       finishMastered();
     } else {
       showRoundComplete();
     }
+  }
+
+  // ---------- Exam timer ----------
+  let examTimerInterval = null;
+
+  function stopExamTimer() {
+    if (examTimerInterval) { clearInterval(examTimerInterval); examTimerInterval = null; }
+  }
+  function startExamTimerIfNeeded() {
+    stopExamTimer();
+    if (!sess || !sess.examMode) return;
+    updateExamTimerDisplay(sess.examDeadline - Date.now());
+    examTimerInterval = setInterval(checkExamTimeout, 1000);
+  }
+  function updateExamTimerDisplay(remainMs) {
+    const s = Math.max(0, Math.ceil(remainMs / 1000));
+    const m = Math.floor(s / 60), sec = s % 60;
+    el.examTimer.textContent = `⏱ ${m}:${String(sec).padStart(2, "0")}`;
+    el.examTimer.classList.toggle("exam-timer-warn", s <= 30);
+  }
+  function checkExamTimeout() {
+    if (!sess || !sess.examMode) { stopExamTimer(); return; }
+    const remain = sess.examDeadline - Date.now();
+    if (remain > 0) { updateExamTimerDisplay(remain); return; }
+    // time's up
+    const optionBtns = Array.from(el.cardOptions.children);
+    if (optionBtns[0] && !optionBtns[0].disabled) {
+      // current question still unanswered — count it as wrong/skipped
+      const q = currentQuestion();
+      sess.roundWrong.push(sess.currentRoundOrder[sess.pos]);
+      recordStat(subject.id, q.id, false);
+      recordActivity(false);
+      sess.pos++;
+    } else if (optionBtns[0]) {
+      // already answered, just hadn't clicked "next" yet — include it in the total
+      sess.pos++;
+    }
+    finishExam(true);
   }
 
   // ---------- Note box (giải thích, tự lưu) ----------
@@ -458,6 +730,54 @@
     renderLibrary();
   });
 
+  // ---------- EXAM RESULT screen ----------
+  function finishExam(timedOut) {
+    stopExamTimer();
+    clearSession();
+
+    const total = sess.pos;
+    const wrongIdxArr = sess.roundWrong.slice();
+    const correct = total - wrongIdxArr.length;
+
+    const examQuestionIds = sess.currentRoundOrder.map((i) => subject.questions[i].id);
+    const examData = loadExamData(subject.id);
+    examData.lastQuestionIds = examQuestionIds;
+    examData.history = examData.history || [];
+    examData.history.unshift({
+      date: Date.now(), total, correct, wrong: wrongIdxArr.length,
+      timeLimitSec: sess.timeLimitSec, timedOut, category: sess.category,
+    });
+    examData.history = examData.history.slice(0, 20);
+    saveExamData(subject.id, examData);
+
+    renderExamResult(total, correct, wrongIdxArr, timedOut);
+    showScreen("examResult");
+  }
+
+  function renderExamResult(total, correct, wrongIdxArr, timedOut) {
+    const pct = total ? Math.round((correct / total) * 100) : 0;
+    el.examResultEyebrow.textContent = timedOut ? "Hết giờ" : "Hoàn thành đúng giờ";
+    el.examResultScore.textContent = `${correct}/${total}`;
+    el.examResultSub.textContent = `Đạt ${pct}%${timedOut ? " — hết thời gian trước khi làm hết." : "."} Lần thi sau sẽ ưu tiên câu chưa xuất hiện ở đề này.`;
+
+    el.examReviewList.innerHTML = "";
+    if (wrongIdxArr.length === 0) {
+      el.examReviewList.innerHTML = `<p class="setup-sub" style="margin:0;">Không có câu sai nào 🎉</p>`;
+      return;
+    }
+    for (const idx of wrongIdxArr) {
+      const q = subject.questions[idx];
+      const correctText = isMulti(q) ? q.answer.map((a) => q.options[a]).join(", ") : q.options[q.answer];
+      const item = document.createElement("div");
+      item.className = "review-item";
+      item.innerHTML = `<p class="review-q">${escapeHtml(q.question)}</p><p class="review-correct">Đáp án đúng: ${escapeHtml(correctText)}</p>`;
+      el.examReviewList.appendChild(item);
+    }
+  }
+
+  el.btnExamRetry.addEventListener("click", () => { el.studyTypeSelect.value = "exam"; openConfig(subject.id); });
+  el.btnExamBackToLibrary.addEventListener("click", () => { showScreen("library"); renderLibrary(); });
+
   // ---------- RESULT screen (mastered) ----------
   function finishMastered() {
     clearSession();
@@ -469,6 +789,27 @@
 
   el.btnRestart.addEventListener("click", () => { showScreen("library"); renderLibrary(); });
   el.btnRetrySame.addEventListener("click", () => { openConfig(subject.id); });
+
+  // ---------- Keyboard shortcuts (quiz screen only) ----------
+  document.addEventListener("keydown", (e) => {
+    if (el.screenQuiz.hidden) return;
+    const activeTag = (document.activeElement && document.activeElement.tagName) || "";
+    if (activeTag === "TEXTAREA" || activeTag === "INPUT") return; // don't hijack while typing a note
+
+    if (e.key >= "1" && e.key <= "9") {
+      const idx = Number(e.key) - 1;
+      const btns = Array.from(el.cardOptions.children);
+      if (btns[idx] && !btns[idx].disabled) {
+        e.preventDefault();
+        btns[idx].click();
+      }
+    } else if (e.key === "Enter") {
+      if (!el.btnNext.disabled) {
+        e.preventDefault();
+        el.btnNext.click();
+      }
+    }
+  });
 
   // ---------- Init ----------
   (async function init() {

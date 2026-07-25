@@ -33,11 +33,34 @@
       <h1 class="setup-title">Chọn môn học<br>để bắt đầu luyện tập</h1>
       <p class="setup-sub">Mỗi môn lưu tiến trình và ghi chú riêng. Sai câu nào, vòng sau ôn lại đúng câu đó đến khi làm đúng hết.</p>
 
+      <div class="motivation-bar" id="motivationBar" hidden>
+        <div class="motivation-stat">
+          <span class="motivation-num" id="motStreak">0</span>
+          <span class="motivation-label">ngày liên tiếp 🔥</span>
+        </div>
+        <div class="motivation-stat">
+          <span class="motivation-num" id="motAccuracy">0%</span>
+          <span class="motivation-label">độ chính xác chung</span>
+        </div>
+        <div class="motivation-stat">
+          <span class="motivation-num" id="motTotal">0</span>
+          <span class="motivation-label">câu đã học (luỹ kế)</span>
+        </div>
+      </div>
+
       <div class="subject-list" id="subjectList"></div>
 
       <label class="btn-upload btn-upload-block" for="fileInput">+ Thêm môn học mới (tải file JSON)
         <input type="file" id="fileInput" accept="application/json,.json" hidden>
       </label>
+
+      <div class="data-actions">
+        <button class="btn-ghost" id="btnExportData">⭳ Xuất dữ liệu (backup)</button>
+        <label class="btn-ghost" for="importFileInput">⭱ Nhập dữ liệu
+          <input type="file" id="importFileInput" accept="application/json,.json" hidden>
+        </label>
+      </div>
+
       <p class="setup-error" id="setupError" hidden></p>
     </div>
   </section>
@@ -50,6 +73,13 @@
       <p class="setup-sub" id="configSub">— câu hỏi</p>
 
       <div class="setup-row">
+        <div class="field">
+          <label class="field-label">Kiểu học</label>
+          <select id="studyTypeSelect" class="field-control">
+            <option value="practice" selected>Luyện tập (theo vòng)</option>
+            <option value="exam">Thi thử (giới hạn giờ)</option>
+          </select>
+        </div>
         <div class="field">
           <label class="field-label">Chương / chủ đề</label>
           <select id="categorySelect" class="field-control"></select>
@@ -64,21 +94,46 @@
             <option value="all">Tất cả</option>
           </select>
         </div>
-        <div class="field">
+        <div class="field" id="modeField">
           <label class="field-label">Chế độ</label>
           <select id="modeSelect" class="field-control">
             <option value="shuffle" selected>Xáo trộn</option>
             <option value="order">Theo thứ tự</option>
           </select>
         </div>
+        <div class="field" id="timeLimitField" hidden>
+          <label class="field-label">Thời gian (phút)</label>
+          <select id="timeLimitSelect" class="field-control">
+            <option value="5">5 phút</option>
+            <option value="10">10 phút</option>
+            <option value="15" selected>15 phút</option>
+            <option value="20">20 phút</option>
+            <option value="30">30 phút</option>
+            <option value="45">45 phút</option>
+            <option value="60">60 phút</option>
+          </select>
+        </div>
       </div>
 
+      <p class="setup-exam-hint" id="setupExamHint" hidden>Ưu tiên câu chưa xuất hiện ở lần thi thử trước — tối đa 20% câu có thể lặp lại nếu bộ đề không còn đủ câu mới.</p>
+
       <button class="btn-primary btn-start" id="btnStart">Bắt đầu vòng 1</button>
+      <button class="btn-secondary btn-start" id="btnViewStats" style="margin-top:10px;">Xem thống kê câu hay sai</button>
 
       <div class="setup-resume" id="setupResume" hidden>
         <p id="resumeProgress"></p>
         <button class="btn-secondary" id="btnResume">Tiếp tục phiên trước</button>
       </div>
+    </div>
+  </section>
+
+  <!-- ===== SCREEN: SUBJECT STATS (thống kê câu hay sai luỹ kế) ===== -->
+  <section class="screen" id="screenStats" hidden>
+    <div class="setup-wrap">
+      <button class="btn-ghost btn-back" id="btnBackFromStats">← Quay lại</button>
+      <h1 class="setup-title">Câu hay sai</h1>
+      <p class="setup-sub" id="statsSubtitle">Thống kê luỹ kế qua mọi lần học.</p>
+      <div class="review-list" id="statsList"></div>
     </div>
   </section>
 
@@ -90,12 +145,15 @@
 
       <div class="quiz-meta">
         <span class="quiz-index"><span id="quizCurrent">1</span> / <span id="quizTotal">20</span></span>
+        <span class="exam-timer" id="examTimer" hidden>⏱ 15:00</span>
         <span class="quiz-cat" id="quizCat"></span>
       </div>
 
       <div class="progress-track">
         <div class="progress-fill" id="progressFill"></div>
       </div>
+
+      <p class="key-hint">Nhấn phím số (1, 2, 3…) để chọn đáp án · Enter để qua câu tiếp theo</p>
 
       <div class="deck">
         <div class="deck-shadow deck-shadow-3"></div>
@@ -140,6 +198,20 @@
         <button class="btn-primary" id="btnNextRound">Vào vòng tiếp theo</button>
         <button class="btn-secondary" id="btnStopHere">Dừng ở đây</button>
       </div>
+    </div>
+  </section>
+
+  <!-- ===== SCREEN: EXAM RESULT (kết thúc thi thử) ===== -->
+  <section class="screen" id="screenExamResult" hidden>
+    <div class="result-wrap">
+      <p class="result-eyebrow" id="examResultEyebrow">Kết quả thi thử</p>
+      <h1 class="result-score" id="examResultScore">0/0</h1>
+      <p class="result-sub" id="examResultSub"></p>
+      <div class="result-actions">
+        <button class="btn-primary" id="btnExamRetry">Thi lại (đề mới)</button>
+        <button class="btn-secondary" id="btnExamBackToLibrary">Về danh sách môn</button>
+      </div>
+      <div class="review-list" id="examReviewList"></div>
     </div>
   </section>
 

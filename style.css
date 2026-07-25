@@ -132,7 +132,7 @@ body {
 .quiz-index { font-family: var(--f-mono); font-size: 13px; color: var(--card); }
 .quiz-cat { font-size: 12px; color: var(--gold); text-transform: uppercase; letter-spacing: 0.06em; }
 
-.progress-track { height: 3px; background: var(--ink-line); border-radius: 2px; overflow: hidden; margin-bottom: 44px; }
+.progress-track { height: 3px; background: var(--ink-line); border-radius: 2px; overflow: hidden; margin-bottom: 14px; }
 .progress-fill { height: 100%; background: var(--gold); width: 0%; transition: width .25s ease; }
 
 /* the deck: signature element - card stack that visibly recedes as you progress */
@@ -237,6 +237,10 @@ body {
   margin-bottom: 14px;
 }
 
+.key-hint {
+  font-size: 12px; color: var(--paper-muted); text-align: center; margin: 0 0 26px;
+}
+
 /* ===== NOTE BOX (giải thích) ===== */
 .note-box { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--card-line); }
 .note-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--paper-muted); margin: 0 0 6px; }
@@ -258,10 +262,37 @@ body {
 .note-edit-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .btn-sm { padding: 8px 14px; font-size: 13px; }
 
+/* ===== MOTIVATION BAR ===== */
+.motivation-bar {
+  display: flex; gap: 10px; margin: 0 0 22px;
+  background: rgba(243,238,225,0.05); border: 1px solid var(--ink-line); border-radius: 12px;
+  padding: 14px 10px;
+}
+.motivation-stat { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.motivation-num { font-family: var(--f-mono); font-size: 20px; color: var(--gold); }
+.motivation-label { font-size: 10.5px; color: var(--paper-muted); line-height: 1.3; }
+
+/* ===== DATA EXPORT/IMPORT ===== */
+.data-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.data-actions .btn-ghost { flex: 1; text-align: center; min-width: 140px; }
+
+/* ===== EXAM TIMER ===== */
+.exam-timer {
+  font-family: var(--f-mono); font-size: 13px; color: var(--gold);
+  border: 1px solid var(--gold); border-radius: 999px; padding: 3px 10px;
+}
+.exam-timer.exam-timer-warn { color: var(--bad); border-color: var(--bad); animation: timerPulse 1s infinite; }
+@keyframes timerPulse { 50% { opacity: 0.5; } }
+
+.setup-exam-hint { font-size: 12.5px; color: var(--paper-muted); margin: -18px 0 20px; line-height: 1.5; }
+
 @media (max-width: 480px) {
   .setup-title { font-size: 27px; }
   .result-score { font-size: 48px; }
   .setup-row { flex-direction: column; }
   .quiz-controls { flex-direction: column-reverse; }
   .subject-card { flex-wrap: wrap; }
+  .motivation-bar { flex-wrap: wrap; }
+  .motivation-stat { min-width: 40%; }
+  .data-actions .btn-ghost { flex: 1 1 100%; }
 }
