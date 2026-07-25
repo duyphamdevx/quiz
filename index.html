@@ -53,6 +53,7 @@
       <label class="btn-upload btn-upload-block" for="fileInput">+ Thêm môn học mới (tải file JSON)
         <input type="file" id="fileInput" accept="application/json,.json" hidden>
       </label>
+      <button class="btn-upload btn-upload-block" id="btnCreateManualSubject" style="margin-top:10px;">+ Tạo môn học mới (nhập tay)</button>
 
       <div class="data-actions">
         <button class="btn-ghost" id="btnExportData">⭳ Xuất dữ liệu (backup)</button>
@@ -118,7 +119,10 @@
       <p class="setup-exam-hint" id="setupExamHint" hidden>Ưu tiên câu chưa xuất hiện ở lần thi thử trước — tối đa 20% câu có thể lặp lại nếu bộ đề không còn đủ câu mới.</p>
 
       <button class="btn-primary btn-start" id="btnStart">Bắt đầu vòng 1</button>
-      <button class="btn-secondary btn-start" id="btnViewStats" style="margin-top:10px;">Xem thống kê câu hay sai</button>
+      <div class="quiz-controls" style="margin-top:10px;">
+        <button class="btn-secondary" id="btnManageQuestions">+ Thêm / sửa câu hỏi thủ công</button>
+        <button class="btn-secondary" id="btnViewStats">Xem thống kê câu hay sai</button>
+      </div>
 
       <div class="setup-resume" id="setupResume" hidden>
         <p id="resumeProgress"></p>
@@ -134,6 +138,48 @@
       <h1 class="setup-title">Câu hay sai</h1>
       <p class="setup-sub" id="statsSubtitle">Thống kê luỹ kế qua mọi lần học.</p>
       <div class="review-list" id="statsList"></div>
+    </div>
+  </section>
+
+  <!-- ===== SCREEN: MANUAL ENTRY (nhập câu hỏi thủ công) ===== -->
+  <section class="screen" id="screenManualEntry" hidden>
+    <div class="setup-wrap">
+      <button class="btn-ghost btn-back" id="btnBackFromManual">← Quay lại</button>
+      <h1 class="setup-title" id="manualTitle">Nhập câu hỏi thủ công</h1>
+      <p class="setup-sub" id="manualSub"></p>
+
+      <div class="field" style="margin-bottom:14px;">
+        <label class="field-label">Chương / chủ đề</label>
+        <input type="text" id="manualCategory" class="field-control" list="manualCategoryList" placeholder="VD: Chương 1">
+        <datalist id="manualCategoryList"></datalist>
+      </div>
+
+      <div class="field" style="margin-bottom:14px;">
+        <label class="field-label">Nội dung câu hỏi</label>
+        <textarea id="manualQuestion" class="field-control manual-textarea" rows="3" placeholder="Nhập nội dung câu hỏi..."></textarea>
+      </div>
+
+      <label class="field-label">Đáp án (chọn nút tròn cho đáp án đúng)</label>
+      <div id="manualOptionsList" class="manual-options-list"></div>
+      <button class="btn-ghost" id="btnAddOption" type="button">+ Thêm đáp án</button>
+
+      <div class="field" style="margin:18px 0 6px;">
+        <label class="field-label">Giải thích (không bắt buộc)</label>
+        <textarea id="manualExplanation" class="field-control manual-textarea" rows="2" placeholder="Giải thích cho câu này..."></textarea>
+      </div>
+
+      <p class="manual-editing-note" id="manualEditingNote" hidden></p>
+      <p class="setup-error" id="manualError" hidden></p>
+
+      <div class="quiz-controls" style="margin-top:14px;">
+        <button class="btn-secondary" id="btnManualClear">Xoá form</button>
+        <button class="btn-primary" id="btnManualSave">Lưu câu hỏi</button>
+      </div>
+
+      <p class="manual-added-count" id="manualAddedCount" hidden></p>
+
+      <h2 class="manual-list-title" id="manualListTitle" hidden>Câu hỏi trong môn này</h2>
+      <div class="review-list" id="manualQuestionList"></div>
     </div>
   </section>
 

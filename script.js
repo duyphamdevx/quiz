@@ -28,6 +28,7 @@
     fileInput: $("fileInput"), setupError: $("setupError"),
     motivationBar: $("motivationBar"), motStreak: $("motStreak"), motAccuracy: $("motAccuracy"), motTotal: $("motTotal"),
     btnExportData: $("btnExportData"), importFileInput: $("importFileInput"),
+    btnCreateManualSubject: $("btnCreateManualSubject"),
 
     screenConfig: $("screenConfig"), btnBackToLibrary: $("btnBackToLibrary"),
     configTitle: $("configTitle"), configSub: $("configSub"),
@@ -35,11 +36,22 @@
     categorySelect: $("categorySelect"), countSelect: $("countSelect"), modeSelect: $("modeSelect"),
     modeField: $("modeField"), timeLimitField: $("timeLimitField"), timeLimitSelect: $("timeLimitSelect"),
     setupExamHint: $("setupExamHint"),
-    btnStart: $("btnStart"), btnViewStats: $("btnViewStats"),
+    btnStart: $("btnStart"), btnViewStats: $("btnViewStats"), btnManageQuestions: $("btnManageQuestions"),
     setupResume: $("setupResume"), resumeProgress: $("resumeProgress"), btnResume: $("btnResume"),
 
     screenStats: $("screenStats"), btnBackFromStats: $("btnBackFromStats"),
     statsSubtitle: $("statsSubtitle"), statsList: $("statsList"),
+
+    screenManualEntry: $("screenManualEntry"), btnBackFromManual: $("btnBackFromManual"),
+    manualTitle: $("manualTitle"), manualSub: $("manualSub"),
+    manualCategory: $("manualCategory"), manualCategoryList: $("manualCategoryList"),
+    manualQuestion: $("manualQuestion"),
+    manualOptionsList: $("manualOptionsList"), btnAddOption: $("btnAddOption"),
+    manualExplanation: $("manualExplanation"),
+    manualEditingNote: $("manualEditingNote"), manualError: $("manualError"),
+    btnManualClear: $("btnManualClear"), btnManualSave: $("btnManualSave"),
+    manualAddedCount: $("manualAddedCount"),
+    manualListTitle: $("manualListTitle"), manualQuestionList: $("manualQuestionList"),
 
     screenQuiz: $("screenQuiz"), roundBadge: $("roundBadge"), examTimer: $("examTimer"),
     quizCurrent: $("quizCurrent"), quizTotal: $("quizTotal"), quizCat: $("quizCat"),
@@ -228,6 +240,7 @@
     el.screenLibrary.hidden = name !== "library";
     el.screenConfig.hidden = name !== "config";
     el.screenStats.hidden = name !== "stats";
+    el.screenManualEntry.hidden = name !== "manualEntry";
     el.screenQuiz.hidden = name !== "quiz";
     el.screenRoundComplete.hidden = name !== "roundComplete";
     el.screenExamResult.hidden = name !== "examResult";
@@ -379,6 +392,19 @@
   el.btnBackToLibrary.addEventListener("click", () => { showScreen("library"); renderLibrary(); });
   el.btnLibrary.addEventListener("click", () => { showScreen("library"); renderLibrary(); });
 
+  el.btnCreateManualSubject.addEventListener("click", () => {
+    const name = (prompt("Đặt tên cho môn học mới:", "") || "").trim();
+    if (!name) return;
+    try {
+      const entry = addSubjectToLibrary(name, []);
+      setError("");
+      renderLibrary();
+      openManualEntry(entry.id, { isNew: true });
+    } catch (err) {
+      setError(err.message);
+    }
+  });
+
   // ---------- CONFIG screen ----------
   let lastStudyType = "practice";
 
@@ -429,6 +455,7 @@
 
   el.btnViewStats.addEventListener("click", () => { renderSubjectStats(); showScreen("stats"); });
   el.btnBackFromStats.addEventListener("click", () => showScreen("config"));
+  el.btnManageQuestions.addEventListener("click", () => openManualEntry(subject.id));
 
   el.btnStart.addEventListener("click", () => {
     const category = el.categorySelect.value;
@@ -508,6 +535,214 @@
       el.statsList.appendChild(item);
     }
   }
+
+  // ---------- MANUAL ENTRY screen (nhập / sửa / xoá câu hỏi thủ công) ----------
+  let manualSubjectId = null;
+  let manualQuestions = [];      // working copy of the subject's full question list
+  let manualIsNewSubject = false;
+  let manualEditingId = null;    // id of question currently being edited, or null when adding new
+  let manualFormOptions = [];    // array of option strings for the form in progress
+  let manualFormCorrect = 0;     // index of the correct option in manualFormOptions
+  let manualAddedThisSession = 0;
+
+  function genManualId() { return `m${Date.now()}${Math.floor(Math.random() * 10000)}`; }
+
+  function setManualError(msg) {
+    if (!msg) { el.manualError.hidden = true; el.manualError.textContent = ""; return; }
+    el.manualError.hidden = false; el.manualError.textContent = msg;
+  }
+
+  function persistManualQuestions() {
+    safeSet(subjectDataKey(manualSubjectId), JSON.stringify(manualQuestions));
+    const entry = library.find((s) => s.id === manualSubjectId);
+    if (entry) { entry.count = manualQuestions.length; saveLibrary(); }
+    if (subject && subject.id === manualSubjectId) subject.questions = manualQuestions;
+  }
+
+  function renderManualOptionsList() {
+    el.manualOptionsList.innerHTML = "";
+    manualFormOptions.forEach((text, idx) => {
+      const row = document.createElement("div");
+      row.className = "manual-option-row";
+      row.innerHTML = `
+        <input type="radio" name="manualAnswerRadio" data-idx="${idx}" ${idx === manualFormCorrect ? "checked" : ""}>
+        <input type="text" class="field-control manual-option-input" data-idx="${idx}" placeholder="Đáp án ${idx + 1}">
+        <button type="button" class="manual-option-remove" data-idx="${idx}" ${manualFormOptions.length <= 2 ? "disabled" : ""} title="Xoá đáp án này">✕</button>
+      `;
+      row.querySelector('input[type="text"]').value = text;
+      el.manualOptionsList.appendChild(row);
+    });
+  }
+
+  el.manualOptionsList.addEventListener("input", (e) => {
+    if (!e.target.classList.contains("manual-option-input")) return;
+    manualFormOptions[Number(e.target.dataset.idx)] = e.target.value;
+  });
+  el.manualOptionsList.addEventListener("change", (e) => {
+    if (e.target.type !== "radio") return;
+    manualFormCorrect = Number(e.target.dataset.idx);
+  });
+  el.manualOptionsList.addEventListener("click", (e) => {
+    if (!e.target.classList.contains("manual-option-remove") || e.target.disabled) return;
+    const idx = Number(e.target.dataset.idx);
+    manualFormOptions.splice(idx, 1);
+    if (manualFormCorrect === idx) manualFormCorrect = 0;
+    else if (manualFormCorrect > idx) manualFormCorrect--;
+    renderManualOptionsList();
+  });
+  el.btnAddOption.addEventListener("click", () => {
+    if (manualFormOptions.length >= 8) { setManualError("Tối đa 8 đáp án cho một câu hỏi."); return; }
+    manualFormOptions.push("");
+    renderManualOptionsList();
+  });
+
+  function softResetManualForm() {
+    manualEditingId = null;
+    manualFormOptions = ["", "", "", ""];
+    manualFormCorrect = 0;
+    el.manualQuestion.value = "";
+    el.manualExplanation.value = "";
+    el.manualEditingNote.hidden = true;
+    renderManualOptionsList();
+    el.manualQuestion.focus();
+  }
+
+  function fullResetManualForm() {
+    el.manualCategory.value = "";
+    softResetManualForm();
+  }
+
+  function renderManualCategoryList() {
+    const cats = Array.from(new Set(manualQuestions.map((q) => q.category)));
+    el.manualCategoryList.innerHTML = cats.map((c) => `<option value="${escapeHtml(c)}"></option>`).join("");
+  }
+
+  function renderManualQuestionList() {
+    if (manualQuestions.length === 0) {
+      el.manualListTitle.hidden = true;
+      el.manualQuestionList.innerHTML = "";
+      return;
+    }
+    el.manualListTitle.hidden = false;
+    el.manualListTitle.textContent = `Câu hỏi trong môn này (${manualQuestions.length})`;
+    el.manualQuestionList.innerHTML = "";
+    const shown = manualQuestions.slice(-200).reverse(); // most recently added first, capped for smooth rendering
+    for (const q of shown) {
+      const item = document.createElement("div");
+      item.className = "review-item";
+      item.innerHTML = `
+        <p class="review-q">${escapeHtml(q.question)}</p>
+        <p class="review-your" style="color:var(--paper-muted)">${escapeHtml(q.category)}</p>
+        <div class="manual-q-item-actions">
+          <button type="button" class="btn-manual-edit">Sửa</button>
+          <button type="button" class="btn-manual-delete is-danger">Xoá</button>
+        </div>
+      `;
+      item.querySelector(".btn-manual-edit").addEventListener("click", () => editManualQuestion(q.id));
+      item.querySelector(".btn-manual-delete").addEventListener("click", () => deleteManualQuestion(q.id));
+      el.manualQuestionList.appendChild(item);
+    }
+  }
+
+  function editManualQuestion(id) {
+    const q = manualQuestions.find((x) => x.id === id);
+    if (!q) return;
+    manualEditingId = id;
+    el.manualCategory.value = q.category;
+    el.manualQuestion.value = q.question;
+    manualFormOptions = q.options.slice();
+    manualFormCorrect = isMulti(q) ? q.answer[0] : q.answer;
+    el.manualExplanation.value = q.explanation || "";
+    renderManualOptionsList();
+    el.manualEditingNote.hidden = false;
+    el.manualEditingNote.innerHTML = isMulti(q)
+      ? `Đang sửa câu hỏi này — câu gốc có nhiều đáp án đúng, lưu lại sẽ chuyển về 1 đáp án đúng duy nhất. Bấm "Lưu câu hỏi" để cập nhật, hoặc <button type="button" id="btnCancelManualEdit" class="note-link">huỷ sửa</button>.`
+      : `Đang sửa câu hỏi này — bấm "Lưu câu hỏi" để cập nhật, hoặc <button type="button" id="btnCancelManualEdit" class="note-link">huỷ sửa</button>.`;
+    $("btnCancelManualEdit").addEventListener("click", () => softResetManualForm());
+    setManualError("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    el.manualQuestion.focus();
+  }
+
+  function deleteManualQuestion(id) {
+    const q = manualQuestions.find((x) => x.id === id);
+    if (!q) return;
+    if (!confirm(`Xoá câu hỏi này khỏi môn?\n\n"${q.question.slice(0, 80)}${q.question.length > 80 ? "…" : ""}"`)) return;
+    manualQuestions = manualQuestions.filter((x) => x.id !== id);
+    persistManualQuestions();
+
+    const notesStore = loadNotes(manualSubjectId);
+    if (notesStore[id] !== undefined) { delete notesStore[id]; safeSet(notesKey(manualSubjectId), JSON.stringify(notesStore)); }
+    const statsStore = loadStats(manualSubjectId);
+    if (statsStore[id] !== undefined) { delete statsStore[id]; safeSet(statsKey(manualSubjectId), JSON.stringify(statsStore)); }
+
+    if (manualEditingId === id) softResetManualForm();
+    el.manualSub.textContent = `Môn này hiện có ${manualQuestions.length} câu.`;
+    renderManualCategoryList();
+    renderManualQuestionList();
+  }
+
+  el.btnManualClear.addEventListener("click", () => { softResetManualForm(); setManualError(""); });
+
+  el.btnManualSave.addEventListener("click", () => {
+    const category = (el.manualCategory.value || "Chung").trim() || "Chung";
+    const question = el.manualQuestion.value.trim();
+    if (!question) { setManualError("Chưa nhập nội dung câu hỏi."); return; }
+
+    const options = manualFormOptions.map((t) => t.trim());
+    if (options.length < 2) { setManualError("Cần ít nhất 2 đáp án."); return; }
+    if (options.some((t) => !t)) { setManualError("Có đáp án còn để trống — điền đủ hoặc bấm ✕ để xoá bớt."); return; }
+    if (manualFormCorrect < 0 || manualFormCorrect >= options.length) { setManualError("Chưa chọn đáp án đúng."); return; }
+
+    const explanation = el.manualExplanation.value.trim();
+    const id = manualEditingId || genManualId();
+    const qObj = { id, category, question, options, answer: manualFormCorrect, explanation };
+
+    const existingIdx = manualQuestions.findIndex((x) => x.id === id);
+    if (existingIdx >= 0) manualQuestions[existingIdx] = qObj;
+    else manualQuestions.push(qObj);
+
+    persistManualQuestions();
+    if (!manualEditingId) manualAddedThisSession++;
+    el.manualAddedCount.hidden = manualAddedThisSession === 0;
+    el.manualAddedCount.textContent = `Đã lưu ${manualAddedThisSession} câu mới trong phiên này.`;
+    el.manualSub.textContent = `Môn này hiện có ${manualQuestions.length} câu.`;
+    setManualError("");
+    softResetManualForm();
+    el.manualCategory.value = category; // keep category filled for fast bulk entry
+    renderManualCategoryList();
+    renderManualQuestionList();
+  });
+
+  function openManualEntry(id, opts) {
+    manualSubjectId = id;
+    manualQuestions = getSubjectQuestions(id);
+    manualIsNewSubject = !!(opts && opts.isNew);
+    manualAddedThisSession = 0;
+
+    const meta = library.find((s) => s.id === id);
+    subject = { id, name: meta ? meta.name : id, questions: manualQuestions };
+    notes = loadNotes(id);
+
+    el.manualTitle.textContent = subject.name;
+    el.manualSub.textContent = `Môn này hiện có ${manualQuestions.length} câu.`;
+    el.manualAddedCount.hidden = true;
+    setManualError("");
+    fullResetManualForm();
+    renderManualCategoryList();
+    renderManualQuestionList();
+    showScreen("manualEntry");
+  }
+
+  el.btnBackFromManual.addEventListener("click", () => {
+    if (manualIsNewSubject && manualQuestions.length === 0) {
+      deleteSubject(manualSubjectId);
+      showScreen("library");
+      renderLibrary();
+    } else {
+      openConfig(manualSubjectId);
+    }
+  });
 
   // ---------- QUIZ screen ----------
   function currentQuestion() { return subject.questions[sess.currentRoundOrder[sess.pos]]; }

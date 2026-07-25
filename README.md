@@ -13,6 +13,7 @@
 - **Thanh động lực**: trên màn hình danh sách môn, hiện số ngày học liên tiếp (streak), độ chính xác chung và tổng số câu đã học luỹ kế trên toàn bộ các môn.
 - **Xuất / nhập dữ liệu**: nút "Xuất dữ liệu" tải về 1 file JSON chứa toàn bộ môn học, tiến trình, ghi chú, thống kê — dùng để sao lưu hoặc chuyển sang máy khác. Nút "Nhập dữ liệu" đọc lại file đó (sẽ ghi đè dữ liệu hiện có trên trình duyệt).
 - **Chế độ thi thử giới hạn giờ**: ở màn hình cấu hình, chọn "Kiểu học" = "Thi thử", chọn số câu và thời gian (phút). Làm hết câu hoặc hết giờ là nộp bài tự động. App tự ưu tiên chọn những câu **chưa** xuất hiện ở lần thi thử gần nhất trong cùng môn — nghĩa là tối đa 20% câu có thể trùng với lần thi trước (chỉ trùng khi bộ đề không còn đủ câu mới).
+- **Nhập câu hỏi thủ công**: không cần đụng tới file JSON. Ở màn danh sách môn, bấm "+ Tạo môn học mới (nhập tay)" để tạo một môn trống rồi gõ câu hỏi trực tiếp; hoặc ở màn cấu hình một môn đã có, bấm "+ Thêm / sửa câu hỏi thủ công" để thêm câu mới, sửa hoặc xoá câu đã có. Mỗi câu hỏi có chương/chủ đề, nội dung, 2–8 đáp án (chọn nút tròn để đánh dấu đáp án đúng), và giải thích tuỳ chọn. Ô "Chương/chủ đề" được giữ nguyên sau mỗi lần lưu để nhập nhanh nhiều câu cùng một chương.
 
 ## 1. Đưa lên GitHub Pages
 
