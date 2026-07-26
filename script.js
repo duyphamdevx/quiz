@@ -2,61 +2,59 @@
   "use strict";
 
   const LIB_KEY = "boDeQuiz.library.v1";
+  const STREAK_KEY = "boDeQuiz.streak.v1";
   const subjectDataKey = (id) => `boDeQuiz.subject.${id}`;
   const notesKey = (id) => `boDeQuiz.notes.${id}`;
   const sessionKey = (id) => `boDeQuiz.session.${id}`;
-  const statsKey = (id) => `boDeQuiz.stats.${id}`;      // cumulative correct/wrong per question
-  const examKey = (id) => `boDeQuiz.exam.${id}`;        // last exam question ids + exam history
-  const ACTIVITY_KEY = "boDeQuiz.activity.v1";          // daily study log, for streak/accuracy
+  const statsKey = (id) => `boDeQuiz.stats.${id}`;
+  const examHistoryKey = (id) => `boDeQuiz.examhistory.${id}`;
 
-  // (option markers use digit numbers 1-9 so they map directly to keyboard shortcuts)
+  const REVIEW_PAGE_SIZE = 20;
 
   // ---------- State ----------
   let library = [];          // [{id, name, count, addedAt}]
   let subject = null;        // { id, name, questions:[...] }
   let notes = {};            // { [qId]: text }  (for current subject)
-  let sess = null;           // active/resumed session for current subject
+  let sess = null;           // active/resumed practice session
+  let examSess = null;       // active exam session
+  let examTimerHandle = null;
+  let examResultWrong = [];
+  let examReviewShown = 0;
+  let statsRows = [];
+  let statsShown = 0;
+  let noteState = { qId: null };
 
   // ---------- DOM ----------
   const $ = (id) => document.getElementById(id);
   const el = {
     brandSubject: $("brandSubject"),
     topbarStats: $("topbarStats"), statScore: $("statScore"), statSeen: $("statSeen"),
+    topbarTimer: $("topbarTimer"), timerText: $("timerText"),
     btnLibrary: $("btnLibrary"),
 
     screenLibrary: $("screenLibrary"), subjectList: $("subjectList"),
-    fileInput: $("fileInput"), setupError: $("setupError"),
-    motivationBar: $("motivationBar"), motStreak: $("motStreak"), motAccuracy: $("motAccuracy"), motTotal: $("motTotal"),
-    btnExportData: $("btnExportData"), importFileInput: $("importFileInput"),
-    btnCreateManualSubject: $("btnCreateManualSubject"),
+    motivationBar: $("motivationBar"), streakNum: $("streakNum"),
+    lifetimeSeen: $("lifetimeSeen"), lifetimeAcc: $("lifetimeAcc"),
+    fileInput: $("fileInput"), fileInputImport: $("fileInputImport"),
+    btnExport: $("btnExport"), setupError: $("setupError"),
 
     screenConfig: $("screenConfig"), btnBackToLibrary: $("btnBackToLibrary"),
     configTitle: $("configTitle"), configSub: $("configSub"),
-    studyTypeSelect: $("studyTypeSelect"),
+    tabPractice: $("tabPractice"), tabExam: $("tabExam"),
+    panelPractice: $("panelPractice"), panelExam: $("panelExam"),
     categorySelect: $("categorySelect"), countSelect: $("countSelect"), modeSelect: $("modeSelect"),
-    modeField: $("modeField"), timeLimitField: $("timeLimitField"), timeLimitSelect: $("timeLimitSelect"),
-    setupExamHint: $("setupExamHint"),
-    btnStart: $("btnStart"), btnViewStats: $("btnViewStats"), btnManageQuestions: $("btnManageQuestions"),
+    btnStart: $("btnStart"),
     setupResume: $("setupResume"), resumeProgress: $("resumeProgress"), btnResume: $("btnResume"),
+    examCategorySelect: $("examCategorySelect"), examCount: $("examCount"), examMinutes: $("examMinutes"),
+    btnStartExam: $("btnStartExam"), btnOpenStats: $("btnOpenStats"),
 
-    screenStats: $("screenStats"), btnBackFromStats: $("btnBackFromStats"),
-    statsSubtitle: $("statsSubtitle"), statsList: $("statsList"),
+    screenStats: $("screenStats"), btnStatsBack: $("btnStatsBack"), statsTitle: $("statsTitle"),
+    statsSummary: $("statsSummary"), statsList: $("statsList"), btnStatsMore: $("btnStatsMore"),
 
-    screenManualEntry: $("screenManualEntry"), btnBackFromManual: $("btnBackFromManual"),
-    manualTitle: $("manualTitle"), manualSub: $("manualSub"),
-    manualCategory: $("manualCategory"), manualCategoryList: $("manualCategoryList"),
-    manualQuestion: $("manualQuestion"),
-    manualOptionsList: $("manualOptionsList"), btnAddOption: $("btnAddOption"),
-    manualExplanation: $("manualExplanation"),
-    manualEditingNote: $("manualEditingNote"), manualError: $("manualError"),
-    btnManualClear: $("btnManualClear"), btnManualSave: $("btnManualSave"),
-    manualAddedCount: $("manualAddedCount"),
-    manualListTitle: $("manualListTitle"), manualQuestionList: $("manualQuestionList"),
-
-    screenQuiz: $("screenQuiz"), roundBadge: $("roundBadge"), examTimer: $("examTimer"),
+    screenQuiz: $("screenQuiz"), roundBadge: $("roundBadge"),
     quizCurrent: $("quizCurrent"), quizTotal: $("quizTotal"), quizCat: $("quizCat"),
     progressFill: $("progressFill"),
-    cardQuestion: $("cardQuestion"), cardOptions: $("cardOptions"),
+    card: $("card"), cardQuestion: $("cardQuestion"), cardOptions: $("cardOptions"),
     noteBox: $("noteBox"), noteDisplay: $("noteDisplay"), noteText: $("noteText"),
     btnEditNote: $("btnEditNote"), btnAddNote: $("btnAddNote"),
     noteEdit: $("noteEdit"), noteTextarea: $("noteTextarea"),
@@ -67,17 +65,36 @@
     roundDoneScore: $("roundDoneScore"), roundDoneSub: $("roundDoneSub"),
     btnNextRound: $("btnNextRound"), btnStopHere: $("btnStopHere"),
 
-    screenExamResult: $("screenExamResult"), examResultEyebrow: $("examResultEyebrow"),
-    examResultScore: $("examResultScore"), examResultSub: $("examResultSub"),
-    btnExamRetry: $("btnExamRetry"), btnExamBackToLibrary: $("btnExamBackToLibrary"),
-    examReviewList: $("examReviewList"),
-
     screenResult: $("screenResult"), resultScore: $("resultScore"), resultSub: $("resultSub"),
     btnRetrySame: $("btnRetrySame"), btnRestart: $("btnRestart"),
+
+    screenExam: $("screenExam"), examCurrent: $("examCurrent"), examTotal: $("examTotal"),
+    examCat: $("examCat"), examProgressFill: $("examProgressFill"),
+    examCard: $("examCard"), examCardQuestion: $("examCardQuestion"), examCardOptions: $("examCardOptions"),
+    btnSubmitExamEarly: $("btnSubmitExamEarly"),
+
+    screenExamResult: $("screenExamResult"), examResultScore: $("examResultScore"), examResultSub: $("examResultSub"),
+    btnExamRetry: $("btnExamRetry"), btnExamBack: $("btnExamBack"),
+    examReviewList: $("examReviewList"), btnExamReviewMore: $("btnExamReviewMore"),
   };
 
   // ---------- Utilities ----------
   function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+  function renderMath(container) {
+    if (!container || !window.renderMathInElement) return;
+    try {
+      window.renderMathInElement(container, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+          { left: "$", right: "$", display: false },
+        ],
+        throwOnError: false,
+      });
+    } catch (e) { /* math rendering is best-effort; plain text still shows */ }
+  }
 
   function shuffle(arr) {
     const a = arr.slice();
@@ -96,6 +113,8 @@
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "") || "mon-hoc";
   }
+
+  function todayStr() { return new Date().toISOString().slice(0, 10); }
 
   function setError(msg) {
     if (!msg) { el.setupError.hidden = true; el.setupError.textContent = ""; return; }
@@ -137,7 +156,7 @@
     const existingIds = new Set(library.map((s) => s.id));
     let n = 2;
     while (existingIds.has(id)) { id = `${slugify(name)}-${n++}`; }
-    const entry = { id, name: name.trim() || "Môn học", count: questions.length, addedAt: Date.now() };
+    const entry = { id, name: (name || "").trim() || "Môn học", count: questions.length, addedAt: Date.now() };
     if (!safeSet(subjectDataKey(id), JSON.stringify(questions))) {
       throw new Error("Không lưu được vào bộ nhớ trình duyệt (có thể đã đầy).");
     }
@@ -153,7 +172,7 @@
     safeRemove(notesKey(id));
     safeRemove(sessionKey(id));
     safeRemove(statsKey(id));
-    safeRemove(examKey(id));
+    safeRemove(examHistoryKey(id));
   }
 
   function getSubjectQuestions(id) {
@@ -168,7 +187,7 @@
       if (!res.ok) return;
       const data = normalizeQuestions(await res.json());
       if (data.length) addSubjectToLibrary("Bộ mẫu", data);
-    } catch (e) { /* no sample file next to page — fine, library just starts empty */ }
+    } catch (e) { /* no sample file next to page — library just starts empty */ }
   }
 
   // ---------- Notes persistence ----------
@@ -182,95 +201,81 @@
     return store;
   }
 
-  // ---------- Session persistence ----------
-  function loadSession(id) {
-    try { return JSON.parse(safeGet(sessionKey(id)) || "null"); } catch (e) { return null; }
-  }
-  function saveSession() {
-    if (!subject || !sess) return;
-    safeSet(sessionKey(subject.id), JSON.stringify(sess));
-  }
-  function clearSession() { if (subject) safeRemove(sessionKey(subject.id)); }
-
-  // ---------- Cumulative wrong/correct stats persistence ----------
+  // ---------- Stats persistence (cumulative across all sessions) ----------
   function loadStats(id) {
     try { return JSON.parse(safeGet(statsKey(id)) || "{}"); } catch (e) { return {}; }
   }
-  function recordStat(id, qId, wasCorrect) {
-    const store = loadStats(id);
-    if (!store[qId]) store[qId] = { correct: 0, wrong: 0 };
-    if (wasCorrect) store[qId].correct++; else store[qId].wrong++;
-    safeSet(statsKey(id), JSON.stringify(store));
+  function recordAnswerStat(subjectId, qId, correct) {
+    const s = loadStats(subjectId);
+    if (!s[qId]) s[qId] = { seen: 0, wrong: 0 };
+    s[qId].seen++;
+    if (!correct) s[qId].wrong++;
+    safeSet(statsKey(subjectId), JSON.stringify(s));
+    recordStreak();
   }
 
-  // ---------- Exam data persistence (last exam question ids + history) ----------
-  function loadExamData(id) {
-    try { return JSON.parse(safeGet(examKey(id)) || "{}"); } catch (e) { return {}; }
+  // ---------- Streak persistence ----------
+  function loadStreak() {
+    try { return JSON.parse(safeGet(STREAK_KEY) || "null") || { lastDate: null, current: 0, best: 0 }; }
+    catch (e) { return { lastDate: null, current: 0, best: 0 }; }
   }
-  function saveExamData(id, data) { safeSet(examKey(id), JSON.stringify(data)); }
+  function recordStreak() {
+    const st = loadStreak();
+    const today = todayStr();
+    if (st.lastDate === today) return;
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    st.current = st.lastDate === yesterday ? st.current + 1 : 1;
+    st.best = Math.max(st.best || 0, st.current);
+    st.lastDate = today;
+    safeSet(STREAK_KEY, JSON.stringify(st));
+  }
 
-  // ---------- Daily activity log (for streak + overall accuracy) ----------
-  function fmtDate(d) {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // ---------- Exam history persistence ----------
+  function loadExamHistory(id) {
+    try { return JSON.parse(safeGet(examHistoryKey(id)) || "[]"); } catch (e) { return []; }
   }
-  function loadActivity() {
-    try { return JSON.parse(safeGet(ACTIVITY_KEY) || "{}"); } catch (e) { return {}; }
+  function saveExamHistory(id, arr) { safeSet(examHistoryKey(id), JSON.stringify(arr.slice(-10))); }
+
+  // ---------- Session persistence (practice) ----------
+  function loadSession(id) {
+    try { return JSON.parse(safeGet(sessionKey(id)) || "null"); } catch (e) { return null; }
   }
-  function recordActivity(wasCorrect) {
-    const activity = loadActivity();
-    const key = fmtDate(new Date());
-    if (!activity[key]) activity[key] = { answered: 0, correct: 0 };
-    activity[key].answered++;
-    if (wasCorrect) activity[key].correct++;
-    safeSet(ACTIVITY_KEY, JSON.stringify(activity));
-  }
-  function computeStreak(activity) {
-    const daySet = new Set(Object.keys(activity).filter((d) => activity[d].answered > 0));
-    if (daySet.size === 0) return 0;
-    const cursor = new Date();
-    if (!daySet.has(fmtDate(cursor))) cursor.setDate(cursor.getDate() - 1); // today not studied yet — check from yesterday
-    let streak = 0;
-    while (daySet.has(fmtDate(cursor))) { streak++; cursor.setDate(cursor.getDate() - 1); }
-    return streak;
-  }
+  function saveSession() { if (subject && sess) safeSet(sessionKey(subject.id), JSON.stringify(sess)); }
+  function clearSession() { if (subject) safeRemove(sessionKey(subject.id)); }
 
   // ---------- Screens ----------
   function showScreen(name) {
-    if (name !== "quiz") stopExamTimer();
     el.screenLibrary.hidden = name !== "library";
     el.screenConfig.hidden = name !== "config";
     el.screenStats.hidden = name !== "stats";
-    el.screenManualEntry.hidden = name !== "manualEntry";
     el.screenQuiz.hidden = name !== "quiz";
     el.screenRoundComplete.hidden = name !== "roundComplete";
-    el.screenExamResult.hidden = name !== "examResult";
     el.screenResult.hidden = name !== "result";
+    el.screenExam.hidden = name !== "exam";
+    el.screenExamResult.hidden = name !== "examResult";
     el.topbarStats.hidden = name !== "quiz";
+    el.topbarTimer.hidden = name !== "exam";
     el.btnLibrary.hidden = name === "library";
     el.brandSubject.textContent = (name === "library" || !subject) ? "Bộ Đề" : subject.name;
   }
 
   // ---------- LIBRARY screen ----------
-  function renderMotivation() {
-    const activity = loadActivity();
-    const streak = computeStreak(activity);
-    let totalCorrect = 0, totalAnswered = 0;
+  function renderMotivationBar() {
+    const st = loadStreak();
+    let totalSeen = 0, totalWrong = 0;
     for (const s of library) {
       const stats = loadStats(s.id);
-      for (const k in stats) {
-        totalCorrect += stats[k].correct || 0;
-        totalAnswered += (stats[k].correct || 0) + (stats[k].wrong || 0);
-      }
+      for (const qid in stats) { totalSeen += stats[qid].seen; totalWrong += stats[qid].wrong; }
     }
-    if (totalAnswered === 0 && streak === 0) { el.motivationBar.hidden = true; return; }
+    if (totalSeen === 0) { el.motivationBar.hidden = true; return; }
     el.motivationBar.hidden = false;
-    el.motStreak.textContent = streak;
-    el.motAccuracy.textContent = totalAnswered ? `${Math.round((totalCorrect / totalAnswered) * 100)}%` : "0%";
-    el.motTotal.textContent = totalAnswered;
+    el.streakNum.textContent = st.current || 0;
+    el.lifetimeSeen.textContent = totalSeen;
+    el.lifetimeAcc.textContent = Math.round(((totalSeen - totalWrong) / totalSeen) * 100) + "%";
   }
 
   function renderLibrary() {
-    renderMotivation();
+    renderMotivationBar();
     if (library.length === 0) {
       el.subjectList.innerHTML = `<p class="setup-sub" style="margin:0 0 4px;">Chưa có môn nào — tải lên một file JSON câu hỏi để bắt đầu.</p>`;
       return;
@@ -279,8 +284,10 @@
     for (const s of library) {
       const savedSess = loadSession(s.id);
       const stats = loadStats(s.id);
-      let wrongCount = 0;
-      for (const k in stats) if (stats[k].wrong > 0) wrongCount++;
+      let seen = 0, wrong = 0;
+      for (const qid in stats) { seen += stats[qid].seen; wrong += stats[qid].wrong; }
+      const acc = seen ? Math.round(((seen - wrong) / seen) * 100) : null;
+
       const card = document.createElement("div");
       card.className = "subject-card";
       card.innerHTML = `
@@ -288,7 +295,7 @@
           <p class="subject-card-name">${escapeHtml(s.name)}</p>
           <div class="subject-card-meta">
             <span>${s.count} câu</span>
-            ${wrongCount > 0 ? `<span class="subject-card-progress" style="color:var(--bad)">${wrongCount} câu hay sai</span>` : ""}
+            ${acc !== null ? `<span>Đã ôn ${seen} lượt · ${acc}% đúng</span>` : ""}
             ${savedSess ? `<span class="subject-card-progress">Đang học dở — vòng ${savedSess.round}</span>` : ""}
           </div>
         </div>
@@ -297,7 +304,7 @@
       card.querySelector(".subject-card-main").addEventListener("click", () => openConfig(s.id));
       card.querySelector(".subject-card-del").addEventListener("click", (e) => {
         e.stopPropagation();
-        if (confirm(`Xoá môn "${s.name}" cùng toàn bộ tiến trình và ghi chú?`)) {
+        if (confirm(`Xoá môn "${s.name}" cùng toàn bộ tiến trình, ghi chú và thống kê?`)) {
           deleteSubject(s.id);
           renderLibrary();
         }
@@ -305,67 +312,6 @@
       el.subjectList.appendChild(card);
     }
   }
-
-  // ---------- Export / Import backup ----------
-  function exportData() {
-    const payload = {
-      version: 1, exportedAt: new Date().toISOString(),
-      library, subjects: {}, notes: {}, sessions: {}, stats: {}, examData: {},
-      activity: loadActivity(),
-    };
-    for (const s of library) {
-      payload.subjects[s.id] = getSubjectQuestions(s.id);
-      payload.notes[s.id] = loadNotes(s.id);
-      payload.sessions[s.id] = loadSession(s.id);
-      payload.stats[s.id] = loadStats(s.id);
-      payload.examData[s.id] = loadExamData(s.id);
-    }
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `bo-de-backup-${fmtDate(new Date())}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  function importData(file) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const payload = JSON.parse(reader.result);
-        if (!payload || !Array.isArray(payload.library)) throw new Error("File backup không đúng định dạng.");
-        if (!confirm("Nhập dữ liệu sẽ GHI ĐÈ toàn bộ môn học, tiến trình, ghi chú và thống kê hiện có trên trình duyệt này. Tiếp tục?")) return;
-        library = payload.library;
-        saveLibrary();
-        for (const s of library) {
-          safeSet(subjectDataKey(s.id), JSON.stringify(payload.subjects?.[s.id] || []));
-          safeSet(notesKey(s.id), JSON.stringify(payload.notes?.[s.id] || {}));
-          if (payload.sessions?.[s.id]) safeSet(sessionKey(s.id), JSON.stringify(payload.sessions[s.id]));
-          else safeRemove(sessionKey(s.id));
-          safeSet(statsKey(s.id), JSON.stringify(payload.stats?.[s.id] || {}));
-          safeSet(examKey(s.id), JSON.stringify(payload.examData?.[s.id] || {}));
-        }
-        safeSet(ACTIVITY_KEY, JSON.stringify(payload.activity || {}));
-        setError("");
-        renderLibrary();
-        alert("Đã nhập dữ liệu thành công.");
-      } catch (err) {
-        setError("Không nhập được file: " + err.message);
-      }
-    };
-    reader.onerror = () => setError("Không đọc được file.");
-    reader.readAsText(file);
-  }
-
-  el.btnExportData.addEventListener("click", exportData);
-  el.importFileInput.addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (file) importData(file);
-    el.importFileInput.value = "";
-  });
 
   el.fileInput.addEventListener("change", (e) => {
     const file = e.target.files[0];
@@ -389,57 +335,104 @@
     el.fileInput.value = "";
   });
 
-  el.btnBackToLibrary.addEventListener("click", () => { showScreen("library"); renderLibrary(); });
-  el.btnLibrary.addEventListener("click", () => { showScreen("library"); renderLibrary(); });
-
-  el.btnCreateManualSubject.addEventListener("click", () => {
-    const name = (prompt("Đặt tên cho môn học mới:", "") || "").trim();
-    if (!name) return;
-    try {
-      const entry = addSubjectToLibrary(name, []);
-      setError("");
-      renderLibrary();
-      openManualEntry(entry.id, { isNew: true });
-    } catch (err) {
-      setError(err.message);
+  // ---------- Export / Import (data management) ----------
+  function exportAll() {
+    const payload = { exportedAt: Date.now(), streak: loadStreak(), subjects: {} };
+    for (const s of library) {
+      payload.subjects[s.id] = {
+        meta: s,
+        questions: getSubjectQuestions(s.id),
+        notes: loadNotes(s.id),
+        stats: loadStats(s.id),
+        examHistory: loadExamHistory(s.id),
+      };
     }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bo-de-backup-${todayStr()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function importAll(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (!data || typeof data.subjects !== "object") throw new Error("File backup không đúng định dạng.");
+        let added = 0, renamed = 0;
+        const existingIds = new Set(library.map((s) => s.id));
+        for (const oldId in data.subjects) {
+          const entry = data.subjects[oldId];
+          let id = oldId;
+          if (existingIds.has(id)) { id = `${oldId}-nhap-${Date.now()}`; renamed++; }
+          existingIds.add(id);
+          const questions = entry.questions || [];
+          const meta = { id, name: (entry.meta && entry.meta.name) || oldId, count: questions.length, addedAt: Date.now() };
+          safeSet(subjectDataKey(id), JSON.stringify(questions));
+          safeSet(notesKey(id), JSON.stringify(entry.notes || {}));
+          safeSet(statsKey(id), JSON.stringify(entry.stats || {}));
+          safeSet(examHistoryKey(id), JSON.stringify(entry.examHistory || []));
+          library.push(meta);
+          added++;
+        }
+        saveLibrary();
+        setError("");
+        renderLibrary();
+        alert(`Đã nhập ${added} môn học${renamed ? ` (${renamed} môn trùng id được đổi tên để không ghi đè)` : ""}.`);
+      } catch (err) {
+        setError("Không nhập được file: " + err.message);
+      }
+    };
+    reader.onerror = () => setError("Không đọc được file.");
+    reader.readAsText(file);
+  }
+
+  el.btnExport.addEventListener("click", exportAll);
+  el.fileInputImport.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file) importAll(file);
+    el.fileInputImport.value = "";
   });
 
-  // ---------- CONFIG screen ----------
-  let lastStudyType = "practice";
+  el.btnBackToLibrary.addEventListener("click", () => { showScreen("library"); renderLibrary(); });
+  el.btnLibrary.addEventListener("click", () => { stopExamTimer(); showScreen("library"); renderLibrary(); });
 
-  function applyStudyTypeUI() {
-    const isExam = el.studyTypeSelect.value === "exam";
-    el.timeLimitField.hidden = !isExam;
-    el.modeField.hidden = isExam; // exam is always shuffled
-    el.setupExamHint.hidden = !isExam;
-    el.btnStart.textContent = isExam ? "Bắt đầu thi thử" : "Bắt đầu vòng 1";
-    lastStudyType = el.studyTypeSelect.value;
+  // ---------- CONFIG screen ----------
+  function switchConfigTab(mode) {
+    el.tabPractice.classList.toggle("is-active", mode === "practice");
+    el.tabExam.classList.toggle("is-active", mode === "exam");
+    el.panelPractice.hidden = mode !== "practice";
+    el.panelExam.hidden = mode !== "exam";
   }
-  el.studyTypeSelect.addEventListener("change", applyStudyTypeUI);
+  el.tabPractice.addEventListener("click", () => switchConfigTab("practice"));
+  el.tabExam.addEventListener("click", () => switchConfigTab("exam"));
 
   function openConfig(id) {
     const questions = getSubjectQuestions(id);
     const meta = library.find((s) => s.id === id);
     subject = { id, name: meta ? meta.name : id, questions };
     notes = loadNotes(id);
+    switchConfigTab("practice");
 
     el.configTitle.textContent = subject.name;
     el.configSub.textContent = `${questions.length} câu hỏi`;
 
     const cats = Array.from(new Set(questions.map((q) => q.category)));
-    el.categorySelect.innerHTML = ['<option value="__all__">Tất cả chương</option>']
+    const catOptionsHtml = ['<option value="__all__">Tất cả chương</option>']
       .concat(cats.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)).join("");
-
-    el.studyTypeSelect.value = lastStudyType;
-    applyStudyTypeUI();
+    el.categorySelect.innerHTML = catOptionsHtml;
+    el.examCategorySelect.innerHTML = catOptionsHtml;
 
     const savedSess = loadSession(id);
     if (savedSess) {
       el.setupResume.hidden = false;
-      const doneInRound = savedSess.pos;
-      el.resumeProgress.textContent = `Vòng ${savedSess.round} — câu ${doneInRound + 1}/${savedSess.currentRoundOrder.length}`;
-      el.btnResume.onclick = () => { sess = savedSess; showScreen("quiz"); renderQuestion(); startExamTimerIfNeeded(); };
+      el.resumeProgress.textContent = `Vòng ${savedSess.round} — câu ${savedSess.pos + 1}/${savedSess.currentRoundOrder.length}`;
+      el.btnResume.onclick = () => { sess = savedSess; showScreen("quiz"); renderQuestion(); };
     } else {
       el.setupResume.hidden = true;
     }
@@ -447,321 +440,96 @@
     showScreen("config");
   }
 
-  function buildPool(category) {
-    let pool = subject.questions.map((_, i) => i);
-    if (category !== "__all__") pool = pool.filter((i) => subject.questions[i].category === category);
-    return pool;
-  }
-
-  el.btnViewStats.addEventListener("click", () => { renderSubjectStats(); showScreen("stats"); });
-  el.btnBackFromStats.addEventListener("click", () => showScreen("config"));
-  el.btnManageQuestions.addEventListener("click", () => openManualEntry(subject.id));
-
   el.btnStart.addEventListener("click", () => {
     const category = el.categorySelect.value;
-    const pool = buildPool(category);
+    const mode = el.modeSelect.value;
+    let pool = subject.questions.map((_, i) => i);
+    if (category !== "__all__") pool = pool.filter((i) => subject.questions[i].category === category);
     if (pool.length === 0) { setError("Chương này không có câu hỏi."); return; }
-    setError("");
 
     const countSel = el.countSelect.value;
-    const isExam = el.studyTypeSelect.value === "exam";
+    let originalSet = mode === "shuffle" ? shuffle(pool) : pool.slice();
+    const n = countSel === "all" ? originalSet.length : Math.min(parseInt(countSel, 10), originalSet.length);
+    originalSet = originalSet.slice(0, n);
 
-    if (isExam) {
-      const desired = countSel === "all" ? pool.length : Math.min(parseInt(countSel, 10), pool.length);
-      const examData = loadExamData(subject.id);
-      const lastIds = new Set(examData.lastQuestionIds || []);
-      const freshIdx = shuffle(pool.filter((i) => !lastIds.has(subject.questions[i].id)));
-      const repeatIdx = shuffle(pool.filter((i) => lastIds.has(subject.questions[i].id)));
-      const examSet = freshIdx.length >= desired
-        ? freshIdx.slice(0, desired)
-        : freshIdx.concat(repeatIdx).slice(0, desired);
-
-      const timeLimitMin = parseInt(el.timeLimitSelect.value, 10);
-      sess = {
-        examMode: true, category, mode: "shuffle", round: 1,
-        currentRoundOrder: examSet,
-        pos: 0,
-        roundWrong: [],
-        firstRoundCorrectCount: 0,
-        originalSetLength: examSet.length,
-        timeLimitSec: timeLimitMin * 60,
-        examDeadline: Date.now() + timeLimitMin * 60 * 1000,
-      };
-    } else {
-      const mode = el.modeSelect.value;
-      let originalSet = mode === "shuffle" ? shuffle(pool) : pool.slice();
-      const n = countSel === "all" ? originalSet.length : Math.min(parseInt(countSel, 10), originalSet.length);
-      originalSet = originalSet.slice(0, n);
-
-      sess = {
-        examMode: false, category, mode, round: 1,
-        currentRoundOrder: originalSet,
-        pos: 0,
-        roundWrong: [],
-        firstRoundCorrectCount: 0,
-        originalSetLength: originalSet.length,
-      };
-    }
-
+    sess = {
+      category, mode, round: 1,
+      currentRoundOrder: originalSet,
+      pos: 0,
+      roundWrong: [],
+      firstRoundCorrectCount: 0,
+      originalSetLength: originalSet.length,
+    };
     saveSession();
     showScreen("quiz");
     renderQuestion();
-    startExamTimerIfNeeded();
   });
 
-  // ---------- Subject stats screen (câu hay sai luỹ kế) ----------
-  function renderSubjectStats() {
-    const stats = loadStats(subject.id);
-    const rows = subject.questions
-      .map((q) => ({ q, wrong: stats[q.id]?.wrong || 0, correct: stats[q.id]?.correct || 0 }))
+  // ---------- STATS screen ----------
+  function openStats() {
+    const s = loadStats(subject.id);
+    statsRows = Object.keys(s)
+      .map((qid) => ({ qid, seen: s[qid].seen, wrong: s[qid].wrong }))
       .filter((r) => r.wrong > 0)
-      .sort((a, b) => b.wrong - a.wrong)
-      .slice(0, 200);
+      .sort((a, b) => b.wrong - a.wrong || (b.wrong / b.seen) - (a.wrong / a.seen));
+    statsShown = 0;
 
-    el.statsSubtitle.textContent = rows.length
-      ? `${subject.name} — ${rows.length} câu từng làm sai, xếp theo số lần sai nhiều nhất (tính luỹ kế qua mọi lần học).`
-      : `${subject.name} — chưa có câu nào bị làm sai. Cứ học tiếp nhé!`;
-
+    el.statsTitle.textContent = `Thống kê — ${subject.name}`;
+    const totalSeen = Object.values(s).reduce((sum, r) => sum + r.seen, 0);
+    const totalWrong = Object.values(s).reduce((sum, r) => sum + r.wrong, 0);
+    const acc = totalSeen ? Math.round(((totalSeen - totalWrong) / totalSeen) * 100) : 0;
+    el.statsSummary.innerHTML = `
+      <div class="stats-summary-item"><span class="stats-summary-num">${totalSeen}</span><span>lượt trả lời</span></div>
+      <div class="stats-summary-item"><span class="stats-summary-num">${acc}%</span><span>đúng chung</span></div>
+      <div class="stats-summary-item"><span class="stats-summary-num">${statsRows.length}</span><span>câu từng sai</span></div>
+    `;
     el.statsList.innerHTML = "";
-    for (const r of rows) {
-      const noteTxt = notes[r.q.id] || r.q.explanation || "";
-      const item = document.createElement("div");
-      item.className = "review-item";
-      item.innerHTML = `
-        <p class="review-q">${escapeHtml(r.q.question)}</p>
-        <p class="review-your">Sai ${r.wrong} lần · đúng ${r.correct} lần</p>
-        ${noteTxt ? `<p class="review-correct" style="color:var(--paper-muted)">${escapeHtml(noteTxt)}</p>` : ""}
+    el.btnStatsMore.hidden = statsRows.length === 0;
+    showScreen("stats");
+    if (statsRows.length) renderStatsPage();
+  }
+
+  function renderStatsPage() {
+    const slice = statsRows.slice(statsShown, statsShown + REVIEW_PAGE_SIZE);
+    const frag = document.createDocumentFragment();
+    for (const r of slice) {
+      const q = subject.questions.find((qq) => qq.id === r.qid);
+      if (!q) continue;
+      const rate = Math.round((r.wrong / r.seen) * 100);
+      const div = document.createElement("div");
+      div.className = "stats-item";
+      div.innerHTML = `
+        <p class="stats-item-q">${escapeHtml(q.question)}</p>
+        <p class="stats-item-meta">Sai ${r.wrong}/${r.seen} lượt (${rate}%)</p>
       `;
-      el.statsList.appendChild(item);
+      frag.appendChild(div);
     }
+    el.statsList.appendChild(frag);
+    statsShown += slice.length;
+    el.btnStatsMore.hidden = statsShown >= statsRows.length;
+    renderMath(el.statsList);
   }
 
-  // ---------- MANUAL ENTRY screen (nhập / sửa / xoá câu hỏi thủ công) ----------
-  let manualSubjectId = null;
-  let manualQuestions = [];      // working copy of the subject's full question list
-  let manualIsNewSubject = false;
-  let manualEditingId = null;    // id of question currently being edited, or null when adding new
-  let manualFormOptions = [];    // array of option strings for the form in progress
-  let manualFormCorrect = 0;     // index of the correct option in manualFormOptions
-  let manualAddedThisSession = 0;
+  el.btnOpenStats.addEventListener("click", openStats);
+  el.btnStatsMore.addEventListener("click", renderStatsPage);
+  el.btnStatsBack.addEventListener("click", () => showScreen("config"));
 
-  function genManualId() { return `m${Date.now()}${Math.floor(Math.random() * 10000)}`; }
-
-  function setManualError(msg) {
-    if (!msg) { el.manualError.hidden = true; el.manualError.textContent = ""; return; }
-    el.manualError.hidden = false; el.manualError.textContent = msg;
-  }
-
-  function persistManualQuestions() {
-    safeSet(subjectDataKey(manualSubjectId), JSON.stringify(manualQuestions));
-    const entry = library.find((s) => s.id === manualSubjectId);
-    if (entry) { entry.count = manualQuestions.length; saveLibrary(); }
-    if (subject && subject.id === manualSubjectId) subject.questions = manualQuestions;
-  }
-
-  function renderManualOptionsList() {
-    el.manualOptionsList.innerHTML = "";
-    manualFormOptions.forEach((text, idx) => {
-      const row = document.createElement("div");
-      row.className = "manual-option-row";
-      row.innerHTML = `
-        <input type="radio" name="manualAnswerRadio" data-idx="${idx}" ${idx === manualFormCorrect ? "checked" : ""}>
-        <input type="text" class="field-control manual-option-input" data-idx="${idx}" placeholder="Đáp án ${idx + 1}">
-        <button type="button" class="manual-option-remove" data-idx="${idx}" ${manualFormOptions.length <= 2 ? "disabled" : ""} title="Xoá đáp án này">✕</button>
-      `;
-      row.querySelector('input[type="text"]').value = text;
-      el.manualOptionsList.appendChild(row);
-    });
-  }
-
-  el.manualOptionsList.addEventListener("input", (e) => {
-    if (!e.target.classList.contains("manual-option-input")) return;
-    manualFormOptions[Number(e.target.dataset.idx)] = e.target.value;
-  });
-  el.manualOptionsList.addEventListener("change", (e) => {
-    if (e.target.type !== "radio") return;
-    manualFormCorrect = Number(e.target.dataset.idx);
-  });
-  el.manualOptionsList.addEventListener("click", (e) => {
-    if (!e.target.classList.contains("manual-option-remove") || e.target.disabled) return;
-    const idx = Number(e.target.dataset.idx);
-    manualFormOptions.splice(idx, 1);
-    if (manualFormCorrect === idx) manualFormCorrect = 0;
-    else if (manualFormCorrect > idx) manualFormCorrect--;
-    renderManualOptionsList();
-  });
-  el.btnAddOption.addEventListener("click", () => {
-    if (manualFormOptions.length >= 8) { setManualError("Tối đa 8 đáp án cho một câu hỏi."); return; }
-    manualFormOptions.push("");
-    renderManualOptionsList();
-  });
-
-  function softResetManualForm() {
-    manualEditingId = null;
-    manualFormOptions = ["", "", "", ""];
-    manualFormCorrect = 0;
-    el.manualQuestion.value = "";
-    el.manualExplanation.value = "";
-    el.manualEditingNote.hidden = true;
-    renderManualOptionsList();
-    el.manualQuestion.focus();
-  }
-
-  function fullResetManualForm() {
-    el.manualCategory.value = "";
-    softResetManualForm();
-  }
-
-  function renderManualCategoryList() {
-    const cats = Array.from(new Set(manualQuestions.map((q) => q.category)));
-    el.manualCategoryList.innerHTML = cats.map((c) => `<option value="${escapeHtml(c)}"></option>`).join("");
-  }
-
-  function renderManualQuestionList() {
-    if (manualQuestions.length === 0) {
-      el.manualListTitle.hidden = true;
-      el.manualQuestionList.innerHTML = "";
-      return;
-    }
-    el.manualListTitle.hidden = false;
-    el.manualListTitle.textContent = `Câu hỏi trong môn này (${manualQuestions.length})`;
-    el.manualQuestionList.innerHTML = "";
-    const shown = manualQuestions.slice(-200).reverse(); // most recently added first, capped for smooth rendering
-    for (const q of shown) {
-      const item = document.createElement("div");
-      item.className = "review-item";
-      item.innerHTML = `
-        <p class="review-q">${escapeHtml(q.question)}</p>
-        <p class="review-your" style="color:var(--paper-muted)">${escapeHtml(q.category)}</p>
-        <div class="manual-q-item-actions">
-          <button type="button" class="btn-manual-edit">Sửa</button>
-          <button type="button" class="btn-manual-delete is-danger">Xoá</button>
-        </div>
-      `;
-      item.querySelector(".btn-manual-edit").addEventListener("click", () => editManualQuestion(q.id));
-      item.querySelector(".btn-manual-delete").addEventListener("click", () => deleteManualQuestion(q.id));
-      el.manualQuestionList.appendChild(item);
-    }
-  }
-
-  function editManualQuestion(id) {
-    const q = manualQuestions.find((x) => x.id === id);
-    if (!q) return;
-    manualEditingId = id;
-    el.manualCategory.value = q.category;
-    el.manualQuestion.value = q.question;
-    manualFormOptions = q.options.slice();
-    manualFormCorrect = isMulti(q) ? q.answer[0] : q.answer;
-    el.manualExplanation.value = q.explanation || "";
-    renderManualOptionsList();
-    el.manualEditingNote.hidden = false;
-    el.manualEditingNote.innerHTML = isMulti(q)
-      ? `Đang sửa câu hỏi này — câu gốc có nhiều đáp án đúng, lưu lại sẽ chuyển về 1 đáp án đúng duy nhất. Bấm "Lưu câu hỏi" để cập nhật, hoặc <button type="button" id="btnCancelManualEdit" class="note-link">huỷ sửa</button>.`
-      : `Đang sửa câu hỏi này — bấm "Lưu câu hỏi" để cập nhật, hoặc <button type="button" id="btnCancelManualEdit" class="note-link">huỷ sửa</button>.`;
-    $("btnCancelManualEdit").addEventListener("click", () => softResetManualForm());
-    setManualError("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    el.manualQuestion.focus();
-  }
-
-  function deleteManualQuestion(id) {
-    const q = manualQuestions.find((x) => x.id === id);
-    if (!q) return;
-    if (!confirm(`Xoá câu hỏi này khỏi môn?\n\n"${q.question.slice(0, 80)}${q.question.length > 80 ? "…" : ""}"`)) return;
-    manualQuestions = manualQuestions.filter((x) => x.id !== id);
-    persistManualQuestions();
-
-    const notesStore = loadNotes(manualSubjectId);
-    if (notesStore[id] !== undefined) { delete notesStore[id]; safeSet(notesKey(manualSubjectId), JSON.stringify(notesStore)); }
-    const statsStore = loadStats(manualSubjectId);
-    if (statsStore[id] !== undefined) { delete statsStore[id]; safeSet(statsKey(manualSubjectId), JSON.stringify(statsStore)); }
-
-    if (manualEditingId === id) softResetManualForm();
-    el.manualSub.textContent = `Môn này hiện có ${manualQuestions.length} câu.`;
-    renderManualCategoryList();
-    renderManualQuestionList();
-  }
-
-  el.btnManualClear.addEventListener("click", () => { softResetManualForm(); setManualError(""); });
-
-  el.btnManualSave.addEventListener("click", () => {
-    const category = (el.manualCategory.value || "Chung").trim() || "Chung";
-    const question = el.manualQuestion.value.trim();
-    if (!question) { setManualError("Chưa nhập nội dung câu hỏi."); return; }
-
-    const options = manualFormOptions.map((t) => t.trim());
-    if (options.length < 2) { setManualError("Cần ít nhất 2 đáp án."); return; }
-    if (options.some((t) => !t)) { setManualError("Có đáp án còn để trống — điền đủ hoặc bấm ✕ để xoá bớt."); return; }
-    if (manualFormCorrect < 0 || manualFormCorrect >= options.length) { setManualError("Chưa chọn đáp án đúng."); return; }
-
-    const explanation = el.manualExplanation.value.trim();
-    const id = manualEditingId || genManualId();
-    const qObj = { id, category, question, options, answer: manualFormCorrect, explanation };
-
-    const existingIdx = manualQuestions.findIndex((x) => x.id === id);
-    if (existingIdx >= 0) manualQuestions[existingIdx] = qObj;
-    else manualQuestions.push(qObj);
-
-    persistManualQuestions();
-    if (!manualEditingId) manualAddedThisSession++;
-    el.manualAddedCount.hidden = manualAddedThisSession === 0;
-    el.manualAddedCount.textContent = `Đã lưu ${manualAddedThisSession} câu mới trong phiên này.`;
-    el.manualSub.textContent = `Môn này hiện có ${manualQuestions.length} câu.`;
-    setManualError("");
-    softResetManualForm();
-    el.manualCategory.value = category; // keep category filled for fast bulk entry
-    renderManualCategoryList();
-    renderManualQuestionList();
-  });
-
-  function openManualEntry(id, opts) {
-    manualSubjectId = id;
-    manualQuestions = getSubjectQuestions(id);
-    manualIsNewSubject = !!(opts && opts.isNew);
-    manualAddedThisSession = 0;
-
-    const meta = library.find((s) => s.id === id);
-    subject = { id, name: meta ? meta.name : id, questions: manualQuestions };
-    notes = loadNotes(id);
-
-    el.manualTitle.textContent = subject.name;
-    el.manualSub.textContent = `Môn này hiện có ${manualQuestions.length} câu.`;
-    el.manualAddedCount.hidden = true;
-    setManualError("");
-    fullResetManualForm();
-    renderManualCategoryList();
-    renderManualQuestionList();
-    showScreen("manualEntry");
-  }
-
-  el.btnBackFromManual.addEventListener("click", () => {
-    if (manualIsNewSubject && manualQuestions.length === 0) {
-      deleteSubject(manualSubjectId);
-      showScreen("library");
-      renderLibrary();
-    } else {
-      openConfig(manualSubjectId);
-    }
-  });
-
-  // ---------- QUIZ screen ----------
+  // ---------- PRACTICE quiz (round loop) ----------
   function currentQuestion() { return subject.questions[sess.currentRoundOrder[sess.pos]]; }
 
   function renderQuestion() {
     const q = currentQuestion();
     const total = sess.currentRoundOrder.length;
 
-    el.roundBadge.textContent = sess.examMode ? "⏱ Thi thử" : `Vòng ${sess.round}`;
-    el.examTimer.hidden = !sess.examMode;
+    el.roundBadge.textContent = `Vòng ${sess.round}`;
     el.quizCurrent.textContent = sess.pos + 1;
     el.quizTotal.textContent = total;
     el.quizCat.textContent = q.category;
     el.progressFill.style.width = `${(sess.pos / total) * 100}%`;
-
     el.statScore.textContent = Math.max(0, sess.pos - sess.roundWrong.length);
     el.statSeen.textContent = sess.pos;
 
-    el.cardQuestion.textContent = q.question;
+    el.cardQuestion.innerHTML = escapeHtml(q.question);
     el.btnNext.disabled = true;
     el.btnNext.textContent = sess.pos + 1 >= total ? "Hoàn tất vòng này" : "Câu tiếp theo";
 
@@ -780,12 +548,13 @@
       el.cardOptions.appendChild(btn);
     });
 
+    renderMath(el.card);
     saveSession();
   }
 
   function handleAnswer(i, correctSet, q) {
     const optionBtns = Array.from(el.cardOptions.children);
-    if (optionBtns[0].disabled) return; // already answered
+    if (optionBtns[0].disabled) return;
 
     optionBtns.forEach((b, idx) => {
       b.disabled = true;
@@ -799,9 +568,7 @@
     } else {
       sess.roundWrong.push(sess.currentRoundOrder[sess.pos]);
     }
-
-    recordStat(subject.id, q.id, wasCorrect);
-    recordActivity(wasCorrect);
+    recordAnswerStat(subject.id, q.id, wasCorrect);
 
     el.statScore.textContent = (sess.pos + 1) - sess.roundWrong.length;
     el.statSeen.textContent = sess.pos + 1;
@@ -816,8 +583,7 @@
     if (!optionBtns[0] || !optionBtns[0].disabled) {
       const q = currentQuestion();
       sess.roundWrong.push(sess.currentRoundOrder[sess.pos]);
-      recordStat(subject.id, q.id, false);
-      recordActivity(false);
+      recordAnswerStat(subject.id, q.id, false);
     }
     advance();
   }
@@ -829,8 +595,6 @@
     sess.pos++;
     if (sess.pos < sess.currentRoundOrder.length) {
       renderQuestion();
-    } else if (sess.examMode) {
-      finishExam(false);
     } else if (sess.roundWrong.length === 0) {
       finishMastered();
     } else {
@@ -838,47 +602,7 @@
     }
   }
 
-  // ---------- Exam timer ----------
-  let examTimerInterval = null;
-
-  function stopExamTimer() {
-    if (examTimerInterval) { clearInterval(examTimerInterval); examTimerInterval = null; }
-  }
-  function startExamTimerIfNeeded() {
-    stopExamTimer();
-    if (!sess || !sess.examMode) return;
-    updateExamTimerDisplay(sess.examDeadline - Date.now());
-    examTimerInterval = setInterval(checkExamTimeout, 1000);
-  }
-  function updateExamTimerDisplay(remainMs) {
-    const s = Math.max(0, Math.ceil(remainMs / 1000));
-    const m = Math.floor(s / 60), sec = s % 60;
-    el.examTimer.textContent = `⏱ ${m}:${String(sec).padStart(2, "0")}`;
-    el.examTimer.classList.toggle("exam-timer-warn", s <= 30);
-  }
-  function checkExamTimeout() {
-    if (!sess || !sess.examMode) { stopExamTimer(); return; }
-    const remain = sess.examDeadline - Date.now();
-    if (remain > 0) { updateExamTimerDisplay(remain); return; }
-    // time's up
-    const optionBtns = Array.from(el.cardOptions.children);
-    if (optionBtns[0] && !optionBtns[0].disabled) {
-      // current question still unanswered — count it as wrong/skipped
-      const q = currentQuestion();
-      sess.roundWrong.push(sess.currentRoundOrder[sess.pos]);
-      recordStat(subject.id, q.id, false);
-      recordActivity(false);
-      sess.pos++;
-    } else if (optionBtns[0]) {
-      // already answered, just hadn't clicked "next" yet — include it in the total
-      sess.pos++;
-    }
-    finishExam(true);
-  }
-
-  // ---------- Note box (giải thích, tự lưu) ----------
-  let noteState = { qId: null, editing: false };
-
+  // ---------- Note box (giải thích, tự lưu theo từng câu) ----------
   function resetNoteBox() {
     el.noteBox.hidden = true;
     el.noteDisplay.hidden = true;
@@ -899,7 +623,8 @@
     if (text) {
       el.noteDisplay.hidden = false;
       el.btnAddNote.hidden = true;
-      el.noteText.textContent = text;
+      el.noteText.innerHTML = escapeHtml(text);
+      renderMath(el.noteBox);
     } else {
       el.noteDisplay.hidden = true;
       el.btnAddNote.hidden = false;
@@ -919,24 +644,19 @@
     el.noteEdit.hidden = false;
     el.noteTextarea.focus();
   });
-  el.btnCancelNote.addEventListener("click", () => {
-    const q = currentQuestion();
-    showNoteBox(q);
-  });
+  el.btnCancelNote.addEventListener("click", () => showNoteBox(currentQuestion()));
   el.btnSaveNote.addEventListener("click", () => {
     const text = el.noteTextarea.value.trim();
     notes = saveNoteFor(subject.id, noteState.qId, text);
-    const q = currentQuestion();
-    showNoteBox(q);
+    showNoteBox(currentQuestion());
   });
 
   // ---------- ROUND COMPLETE screen ----------
   function showRoundComplete() {
     const total = sess.currentRoundOrder.length;
     const wrong = sess.roundWrong.length;
-    const correct = total - wrong;
     el.roundDoneEyebrow.textContent = `Xong vòng ${sess.round}`;
-    el.roundDoneScore.textContent = `${correct}/${total}`;
+    el.roundDoneScore.textContent = `${total - wrong}/${total}`;
     el.roundDoneSub.textContent = `${wrong} câu sai sẽ được hỏi lại ở vòng ${sess.round + 1}.`;
     showScreen("roundComplete");
   }
@@ -957,61 +677,13 @@
   });
 
   el.btnStopHere.addEventListener("click", () => {
-    // Roll the session over to "start of next round" before saving, so a
-    // resumed session always points at a valid, unanswered question.
+    // Roll over to "start of next round" before saving, so a resumed
+    // session always points at a valid, unanswered question.
     advanceToNextRound();
     saveSession();
     showScreen("library");
     renderLibrary();
   });
-
-  // ---------- EXAM RESULT screen ----------
-  function finishExam(timedOut) {
-    stopExamTimer();
-    clearSession();
-
-    const total = sess.pos;
-    const wrongIdxArr = sess.roundWrong.slice();
-    const correct = total - wrongIdxArr.length;
-
-    const examQuestionIds = sess.currentRoundOrder.map((i) => subject.questions[i].id);
-    const examData = loadExamData(subject.id);
-    examData.lastQuestionIds = examQuestionIds;
-    examData.history = examData.history || [];
-    examData.history.unshift({
-      date: Date.now(), total, correct, wrong: wrongIdxArr.length,
-      timeLimitSec: sess.timeLimitSec, timedOut, category: sess.category,
-    });
-    examData.history = examData.history.slice(0, 20);
-    saveExamData(subject.id, examData);
-
-    renderExamResult(total, correct, wrongIdxArr, timedOut);
-    showScreen("examResult");
-  }
-
-  function renderExamResult(total, correct, wrongIdxArr, timedOut) {
-    const pct = total ? Math.round((correct / total) * 100) : 0;
-    el.examResultEyebrow.textContent = timedOut ? "Hết giờ" : "Hoàn thành đúng giờ";
-    el.examResultScore.textContent = `${correct}/${total}`;
-    el.examResultSub.textContent = `Đạt ${pct}%${timedOut ? " — hết thời gian trước khi làm hết." : "."} Lần thi sau sẽ ưu tiên câu chưa xuất hiện ở đề này.`;
-
-    el.examReviewList.innerHTML = "";
-    if (wrongIdxArr.length === 0) {
-      el.examReviewList.innerHTML = `<p class="setup-sub" style="margin:0;">Không có câu sai nào 🎉</p>`;
-      return;
-    }
-    for (const idx of wrongIdxArr) {
-      const q = subject.questions[idx];
-      const correctText = isMulti(q) ? q.answer.map((a) => q.options[a]).join(", ") : q.options[q.answer];
-      const item = document.createElement("div");
-      item.className = "review-item";
-      item.innerHTML = `<p class="review-q">${escapeHtml(q.question)}</p><p class="review-correct">Đáp án đúng: ${escapeHtml(correctText)}</p>`;
-      el.examReviewList.appendChild(item);
-    }
-  }
-
-  el.btnExamRetry.addEventListener("click", () => { el.studyTypeSelect.value = "exam"; openConfig(subject.id); });
-  el.btnExamBackToLibrary.addEventListener("click", () => { showScreen("library"); renderLibrary(); });
 
   // ---------- RESULT screen (mastered) ----------
   function finishMastered() {
@@ -1023,26 +695,188 @@
   }
 
   el.btnRestart.addEventListener("click", () => { showScreen("library"); renderLibrary(); });
-  el.btnRetrySame.addEventListener("click", () => { openConfig(subject.id); });
+  el.btnRetrySame.addEventListener("click", () => openConfig(subject.id));
 
-  // ---------- Keyboard shortcuts (quiz screen only) ----------
+  // ---------- EXAM mode (timed, ≤20% overlap with previous exam) ----------
+  function pickExamQuestions(pool, n, lastIdSet) {
+    const nonOverlap = pool.filter((i) => !lastIdSet.has(subject.questions[i].id));
+    const overlap = pool.filter((i) => lastIdSet.has(subject.questions[i].id));
+    const minNonOverlap = Math.ceil(n * 0.8);
+    let chosen = shuffle(nonOverlap).slice(0, Math.min(minNonOverlap, nonOverlap.length));
+    const remaining = n - chosen.length;
+    chosen = chosen.concat(shuffle(overlap).slice(0, Math.min(remaining, overlap.length)));
+    if (chosen.length < n) {
+      const used = new Set(chosen);
+      const leftover = shuffle(pool.filter((i) => !used.has(i)));
+      chosen = chosen.concat(leftover.slice(0, n - chosen.length));
+    }
+    return shuffle(chosen);
+  }
+
+  function startExamWithParams(category, n, minutes) {
+    let pool = subject.questions.map((_, i) => i);
+    if (category !== "__all__") pool = pool.filter((i) => subject.questions[i].category === category);
+    if (pool.length === 0) { setError("Chương này không có câu hỏi."); return; }
+    n = Math.max(1, Math.min(n, pool.length));
+    minutes = Math.max(1, minutes);
+
+    const history = loadExamHistory(subject.id);
+    const lastExam = history.length ? history[history.length - 1] : null;
+    const lastIds = new Set(lastExam ? lastExam.questionIds : []);
+
+    const order = pickExamQuestions(pool, n, lastIds);
+    examSess = {
+      category, order, pos: 0,
+      answers: new Array(order.length).fill(-1),
+      durationSec: minutes * 60,
+      endsAt: Date.now() + minutes * 60 * 1000,
+    };
+    startExamTimer();
+    showScreen("exam");
+    renderExamQuestion();
+  }
+
+  el.btnStartExam.addEventListener("click", () => {
+    const category = el.examCategorySelect.value;
+    const n = parseInt(el.examCount.value, 10) || 20;
+    const minutes = parseInt(el.examMinutes.value, 10) || 15;
+    startExamWithParams(category, n, minutes);
+  });
+
+  function startExamTimer() {
+    el.topbarTimer.hidden = false;
+    updateTimerDisplay();
+    clearInterval(examTimerHandle);
+    examTimerHandle = setInterval(() => {
+      if (examSess.endsAt - Date.now() <= 0) { finishExam(true); return; }
+      updateTimerDisplay();
+    }, 1000);
+  }
+  function updateTimerDisplay() {
+    const remain = Math.max(0, examSess.endsAt - Date.now());
+    const m = Math.floor(remain / 60000), s = Math.floor((remain % 60000) / 1000);
+    el.timerText.textContent = `${m}:${String(s).padStart(2, "0")}`;
+  }
+  function stopExamTimer() { clearInterval(examTimerHandle); examTimerHandle = null; }
+
+  function renderExamQuestion() {
+    const q = subject.questions[examSess.order[examSess.pos]];
+    const total = examSess.order.length;
+    el.examCurrent.textContent = examSess.pos + 1;
+    el.examTotal.textContent = total;
+    el.examCat.textContent = q.category;
+    el.examProgressFill.style.width = `${(examSess.pos / total) * 100}%`;
+    el.examCardQuestion.innerHTML = escapeHtml(q.question);
+
+    el.examCardOptions.innerHTML = "";
+    q.options.forEach((optText, i) => {
+      const btn = document.createElement("button");
+      btn.className = "option";
+      btn.type = "button";
+      btn.innerHTML = `<span class="option-letter">${i + 1}</span><span>${escapeHtml(optText)}</span>`;
+      btn.addEventListener("click", () => selectExamOption(i, btn));
+      el.examCardOptions.appendChild(btn);
+    });
+    renderMath(el.examCard);
+  }
+
+  function selectExamOption(i, btn) {
+    const btns = Array.from(el.examCardOptions.children);
+    if (btns[0].disabled) return;
+    btns.forEach((b) => (b.disabled = true));
+    btn.classList.add("is-selected");
+    examSess.answers[examSess.pos] = i;
+    setTimeout(advanceExam, 180);
+  }
+
+  function advanceExam() {
+    examSess.pos++;
+    if (examSess.pos < examSess.order.length) renderExamQuestion();
+    else finishExam(false);
+  }
+
+  el.btnSubmitExamEarly.addEventListener("click", () => finishExam(false));
+
+  function finishExam(timeUp) {
+    stopExamTimer();
+    let correct = 0;
+    const wrongList = [];
+    examSess.order.forEach((poolIdx, i) => {
+      const q = subject.questions[poolIdx];
+      const chosen = examSess.answers[i];
+      const correctSet = new Set(isMulti(q) ? q.answer : [q.answer]);
+      const isCorrect = chosen !== -1 && correctSet.has(chosen);
+      if (isCorrect) correct++; else wrongList.push({ qIndex: poolIdx, chosen });
+      recordAnswerStat(subject.id, q.id, isCorrect);
+    });
+
+    const timeUsedSec = examSess.durationSec - Math.max(0, Math.round((examSess.endsAt - Date.now()) / 1000));
+    const record = {
+      id: Date.now(), at: Date.now(), category: examSess.category,
+      questionIds: examSess.order.map((idx) => subject.questions[idx].id),
+      score: correct, total: examSess.order.length,
+      durationSec: examSess.durationSec, timeUsedSec,
+    };
+    const history = loadExamHistory(subject.id);
+    history.push(record);
+    saveExamHistory(subject.id, history);
+
+    examResultWrong = wrongList;
+    examReviewShown = 0;
+
+    el.examResultScore.textContent = `${correct}/${examSess.order.length}`;
+    const pct = Math.round((correct / examSess.order.length) * 100);
+    const mm = Math.floor(timeUsedSec / 60), ssec = String(timeUsedSec % 60).padStart(2, "0");
+    el.examResultSub.textContent = `${pct}%${timeUp ? " — hết giờ" : ""} · thời gian dùng ${mm}:${ssec}`;
+    el.examReviewList.innerHTML = "";
+    el.btnExamReviewMore.hidden = wrongList.length === 0;
+    showScreen("examResult");
+    if (wrongList.length) renderExamReviewPage();
+  }
+
+  function renderExamReviewPage() {
+    const slice = examResultWrong.slice(examReviewShown, examReviewShown + REVIEW_PAGE_SIZE);
+    const frag = document.createDocumentFragment();
+    for (const w of slice) {
+      const q = subject.questions[w.qIndex];
+      const yourAnswer = w.chosen === -1 ? "Bỏ trống" : q.options[w.chosen];
+      const correctText = isMulti(q) ? q.answer.map((a) => q.options[a]).join(", ") : q.options[q.answer];
+      const div = document.createElement("div");
+      div.className = "review-item";
+      div.innerHTML = `
+        <p class="review-q">${escapeHtml(q.question)}</p>
+        <p class="review-your">Bạn chọn: ${escapeHtml(yourAnswer)}</p>
+        <p class="review-correct">Đáp án đúng: ${escapeHtml(correctText)}</p>
+      `;
+      frag.appendChild(div);
+    }
+    el.examReviewList.appendChild(frag);
+    examReviewShown += slice.length;
+    el.btnExamReviewMore.hidden = examReviewShown >= examResultWrong.length;
+    renderMath(el.examReviewList);
+  }
+  el.btnExamReviewMore.addEventListener("click", renderExamReviewPage);
+
+  el.btnExamRetry.addEventListener("click", () => {
+    startExamWithParams(examSess.category, examSess.order.length, examSess.durationSec / 60);
+  });
+  el.btnExamBack.addEventListener("click", () => { showScreen("library"); renderLibrary(); });
+
+  // ---------- Keyboard shortcuts (quiz / exam screens only) ----------
   document.addEventListener("keydown", (e) => {
-    if (el.screenQuiz.hidden) return;
+    const inQuiz = !el.screenQuiz.hidden;
+    const inExam = !el.screenExam.hidden;
+    if (!inQuiz && !inExam) return;
     const activeTag = (document.activeElement && document.activeElement.tagName) || "";
-    if (activeTag === "TEXTAREA" || activeTag === "INPUT") return; // don't hijack while typing a note
+    if (activeTag === "TEXTAREA" || activeTag === "INPUT") return;
 
     if (e.key >= "1" && e.key <= "9") {
+      const container = inExam ? el.examCardOptions : el.cardOptions;
       const idx = Number(e.key) - 1;
-      const btns = Array.from(el.cardOptions.children);
-      if (btns[idx] && !btns[idx].disabled) {
-        e.preventDefault();
-        btns[idx].click();
-      }
-    } else if (e.key === "Enter") {
-      if (!el.btnNext.disabled) {
-        e.preventDefault();
-        el.btnNext.click();
-      }
+      const btns = Array.from(container.children);
+      if (btns[idx] && !btns[idx].disabled) { e.preventDefault(); btns[idx].click(); }
+    } else if (e.key === "Enter" && inQuiz) {
+      if (!el.btnNext.disabled) { e.preventDefault(); el.btnNext.click(); }
     }
   });
 

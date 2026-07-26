@@ -2,66 +2,85 @@
 
 Ứng dụng tĩnh (HTML/CSS/JS thuần, không cần build, không cần backend). Mượt kể cả với vài nghìn câu hỏi vì tại một thời điểm chỉ có **đúng 1 câu hỏi** được vẽ ra màn hình.
 
-## Tính năng chính
-
-- **Nhiều môn học**: thêm bao nhiêu môn tuỳ ý (mỗi môn là một file JSON). Mỗi môn lưu tiến trình và ghi chú **riêng biệt**, không ảnh hưởng lẫn nhau.
-- **Học theo vòng, lặp đến khi đúng hết**: vòng 1 làm hết các câu đã chọn; câu nào sai, vòng 2 sẽ chỉ hỏi lại đúng những câu đó; cứ thế đến khi một vòng không còn câu sai nào — coi như đã thuộc bộ đó. Điểm cuối cùng hiển thị là điểm **lần làm đầu tiên** (vòng 1) và số vòng cần để thuộc hết.
-- **Giải thích tự lưu**: sau khi trả lời mỗi câu, có nút "+ Thêm giải thích" — gõ ghi chú của riêng bạn, bấm Lưu. Ghi chú này lưu vào trình duyệt và sẽ hiện lại y nguyên ở những lần học sau, kể cả sau khi tắt trình duyệt.
-- Tự lưu phiên đang học dở (kể cả đang ở giữa vòng) — quay lại là có nút "Tiếp tục phiên trước" hoặc "Đang học dở — vòng X" ngay trên thẻ môn học.
-- Bấm phím số (1, 2, 3…) để chọn đáp án, Enter để qua câu tiếp theo.
-- **Thống kê câu hay sai (luỹ kế)**: mỗi môn có nút "Xem thống kê câu hay sai" — liệt kê các câu bạn từng làm sai, xếp theo số lần sai nhiều nhất, tính gộp qua **mọi lần học** chứ không chỉ phiên hiện tại.
-- **Thanh động lực**: trên màn hình danh sách môn, hiện số ngày học liên tiếp (streak), độ chính xác chung và tổng số câu đã học luỹ kế trên toàn bộ các môn.
-- **Xuất / nhập dữ liệu**: nút "Xuất dữ liệu" tải về 1 file JSON chứa toàn bộ môn học, tiến trình, ghi chú, thống kê — dùng để sao lưu hoặc chuyển sang máy khác. Nút "Nhập dữ liệu" đọc lại file đó (sẽ ghi đè dữ liệu hiện có trên trình duyệt).
-- **Chế độ thi thử giới hạn giờ**: ở màn hình cấu hình, chọn "Kiểu học" = "Thi thử", chọn số câu và thời gian (phút). Làm hết câu hoặc hết giờ là nộp bài tự động. App tự ưu tiên chọn những câu **chưa** xuất hiện ở lần thi thử gần nhất trong cùng môn — nghĩa là tối đa 20% câu có thể trùng với lần thi trước (chỉ trùng khi bộ đề không còn đủ câu mới).
-- **Nhập câu hỏi thủ công**: không cần đụng tới file JSON. Ở màn danh sách môn, bấm "+ Tạo môn học mới (nhập tay)" để tạo một môn trống rồi gõ câu hỏi trực tiếp; hoặc ở màn cấu hình một môn đã có, bấm "+ Thêm / sửa câu hỏi thủ công" để thêm câu mới, sửa hoặc xoá câu đã có. Mỗi câu hỏi có chương/chủ đề, nội dung, 2–8 đáp án (chọn nút tròn để đánh dấu đáp án đúng), và giải thích tuỳ chọn. Ô "Chương/chủ đề" được giữ nguyên sau mỗi lần lưu để nhập nhanh nhiều câu cùng một chương.
-
 ## 1. Đưa lên GitHub Pages
 
 1. Tạo một repo mới trên GitHub, ví dụ `quiz-app`.
-2. Đưa 4 file này vào repo: `index.html`, `style.css`, `script.js`, `questions.json`.
+2. Đưa các file này vào repo: `index.html`, `style.css`, `script.js`, `questions.json`.
 3. Vào **Settings → Pages** → **Build and deployment** → Source chọn **Deploy from a branch** → Branch `main`, thư mục `/ (root)` → Save.
 4. Sau khoảng 1 phút, trang chạy tại `https://<tên-github-của-bạn>.github.io/quiz-app/`.
 
-Thử trước ở máy mình (không mở file `index.html` trực tiếp bằng double-click vì `fetch` sẽ không đọc được `questions.json` qua `file://`):
-
+Thử trước ở máy mình (không mở file `index.html` bằng double-click vì `fetch` không đọc được `questions.json` qua `file://`):
 ```bash
 python3 -m http.server 8000
 ```
 rồi mở `http://localhost:8000`.
 
-## 2. Thêm môn học mới
+## 2. Viết công thức toán trong câu hỏi
 
-Ở màn hình đầu, bấm **"+ Thêm môn học mới"**, chọn file `.json` đúng định dạng bên dưới. App sẽ hỏi tên môn (ví dụ "Toán 10", "Tiếng Anh - Unit 5"...) rồi lưu thành một môn riêng trong danh sách — không cần deploy lại, không ghi đè môn đã có.
+App đã tích hợp sẵn **KaTeX** để hiển thị công thức toán (phân số, luỹ thừa, căn, tích phân...). Trong file JSON, bọc công thức bằng `\\(` `\\)` (công thức trên dòng) hoặc `$$` `$$` (công thức riêng một dòng lớn), viết theo cú pháp LaTeX:
 
-Định dạng mỗi câu hỏi trong file JSON:
+```json
+{
+  "id": 1,
+  "category": "Giải tích",
+  "question": "Xét bài toán tối ưu \\(f(x,y) = -\\frac{1}{3}x^3 + x - \\frac{1}{3}y^3 + y\\). Điểm nào không là điểm dừng?",
+  "options": ["(1, 1)", "(1, -1)", "(-1, 1)", "(-1, -1)"],
+  "answer": 3
+}
+```
+
+Vài ký hiệu LaTeX hay dùng:
+- Phân số: `\frac{tử}{mẫu}` → \(\frac{1}{3}\)
+- Luỹ thừa / chỉ số dưới: `x^3`, `x_1`
+- Căn: `\sqrt{x}`, `\sqrt[3]{x}`
+- Ký hiệu Hy Lạp: `\alpha`, `\beta`, `\pi`
+- Đạo hàm riêng: `\frac{\partial f}{\partial x}`
+- Vô cực, tổng, tích phân: `\infty`, `\sum_{i=1}^{n}`, `\int_{a}^{b}`
+
+Lưu ý khi gõ trong JSON: mỗi dấu `\` trong LaTeX phải gõ thành `\\` (hai dấu gạch chéo) vì JSON dùng `\` làm ký tự thoát — ví dụ `\frac` viết thành `\\frac`. Công thức trong `options` và trong `explanation` cũng render được tương tự. Có thể dán thử ở [jsonlint.com](https://jsonlint.com) để kiểm tra JSON hợp lệ trước khi lưu.
+
+## 3. Tính năng chính
+
+- **Nhiều môn học** — mỗi môn một file JSON riêng, tiến trình/ghi chú/thống kê tách biệt hoàn toàn.
+- **Học theo vòng, lặp đến khi đúng hết** — vòng 1 làm hết các câu đã chọn; câu sai vòng sau chỉ hỏi lại đúng câu đó, lặp đến khi một vòng không còn câu sai. Điểm hiển thị cuối cùng là điểm **lần làm đầu tiên**.
+- **Bấm phím số 1, 2, 3… để chọn đáp án**, Enter để qua câu tiếp theo.
+- **Giải thích tự lưu theo từng câu** — bấm "+ Thêm giải thích" để ghi chú của riêng bạn, lưu lại vĩnh viễn cho câu đó, có thể sửa lại bất cứ lúc nào.
+- **Thi thử giới hạn giờ** — chọn số câu và thời gian (phút), làm bài không thấy đúng/sai ngay (giống thi thật), chỉ chấm điểm khi nộp bài hoặc hết giờ. **Tối đa 20% số câu trong đề trùng với lần thi gần nhất** của cùng môn/chương đó (nếu ngân hàng câu hỏi đủ lớn) — nên mỗi lần thi thử sẽ chủ yếu gặp câu mới, ít bị học tủ.
+- **Thống kê câu sai luỹ kế** — bấm "📊 Xem thống kê câu sai" ở màn hình cấu hình môn để xem những câu bạn hay sai nhất tính dồn qua *tất cả* các lần học và thi (không chỉ phiên hiện tại), kèm tỉ lệ sai.
+- **Thanh động lực** — chuỗi ngày học liên tiếp, tổng số câu đã ôn, tỉ lệ đúng chung — hiện ngay ở màn hình danh sách môn.
+- **Xuất/nhập dữ liệu** — nút "⭱ Xuất dữ liệu" tải về một file JSON chứa toàn bộ môn học, ghi chú, thống kê, lịch sử thi của bạn để backup hoặc chuyển sang máy khác; "⭳ Nhập dữ liệu" nạp lại file đó (môn trùng tên sẽ được thêm bản mới, không ghi đè môn đang có).
+- Tự lưu phiên đang học dở, kể cả đang ở giữa vòng.
+
+## 4. Thêm môn học mới
+
+Ở màn hình đầu, bấm **"+ Thêm môn học mới"**, chọn file `.json`. Định dạng mỗi câu hỏi:
 
 ```json
 {
   "id": 26,
   "category": "Chương 1",
-  "question": "Nội dung câu hỏi?",
+  "question": "Nội dung câu hỏi (có thể chứa công thức toán như trên)?",
   "options": ["Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D"],
   "answer": 1,
   "explanation": "Giải thích mặc định (không bắt buộc)"
 }
 ```
 
-- `answer` là **chỉ số** (bắt đầu từ 0) của đáp án đúng trong mảng `options`.
-- `category` dùng làm "chương/chủ đề" để lọc trong một môn — đặt tên tuỳ ý.
-- `explanation` không bắt buộc — nếu có sẽ là giải thích mặc định hiển thị sau khi trả lời; bạn vẫn có thể bấm "Sửa" để viết đè ghi chú của riêng mình, ghi chú này được ưu tiên hiển thị từ đó về sau.
-- Thêm được vài trăm đến vài nghìn câu trong một file, không giật lag.
+- `answer` là **chỉ số** (bắt đầu từ 0) của đáp án đúng.
+- `category` dùng làm "chương/chủ đề" để lọc trong một môn.
+- `explanation` không bắt buộc — nếu có, đây là giải thích mặc định; bạn vẫn có thể bấm "Sửa" để viết đè ghi chú riêng, ghi chú riêng sẽ được ưu tiên hiển thị từ đó về sau.
 
-`questions.json` đi kèm chỉ là một bộ mẫu để bạn xem định dạng — lần chạy đầu tiên nó sẽ tự được thêm vào danh sách môn học với tên "Bộ mẫu".
+`questions.json` đi kèm là bộ mẫu minh hoạ định dạng, lần chạy đầu tự thêm vào danh sách môn với tên "Bộ mẫu".
 
-## 3. Lưu trữ hoạt động thế nào
+## 5. Lưu trữ hoạt động thế nào
 
-Toàn bộ dữ liệu (danh sách môn, câu hỏi từng môn, ghi chú, phiên đang học dở) lưu trong `localStorage` của trình duyệt — **chỉ trên máy/trình duyệt bạn đang dùng**, không đồng bộ giữa các thiết bị, không gửi lên đâu cả. Xoá một môn ở danh sách sẽ xoá luôn ghi chú và tiến trình của môn đó.
+Toàn bộ dữ liệu (môn học, câu hỏi, ghi chú, thống kê, lịch sử thi, streak) lưu trong `localStorage` của trình duyệt — chỉ trên máy/trình duyệt bạn đang dùng, không đồng bộ giữa các thiết bị. Dùng nút **Xuất dữ liệu** định kỳ để backup phòng khi xoá cache hoặc đổi máy. Xoá một môn ở danh sách sẽ xoá luôn ghi chú, thống kê và tiến trình của môn đó.
 
 ## Cấu trúc file
 
 ```
-index.html     — khung giao diện (danh sách môn, cấu hình, quiz, kết quả)
+index.html     — khung giao diện (danh sách môn, cấu hình, luyện tập, thi thử, thống kê)
 style.css      — giao diện
-script.js      — toàn bộ logic: môn học, vòng lặp ôn câu sai, ghi chú, lưu tiến trình
-questions.json — bộ câu hỏi mẫu, chỉ dùng để minh hoạ định dạng
+script.js      — toàn bộ logic: môn học, vòng lặp ôn câu sai, ghi chú, thi thử, thống kê, backup
+questions.json — bộ câu hỏi mẫu, minh hoạ định dạng
 ```

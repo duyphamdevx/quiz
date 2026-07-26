@@ -241,6 +241,58 @@ body {
   font-size: 12px; color: var(--paper-muted); text-align: center; margin: 0 0 26px;
 }
 
+/* ===== MOTIVATION BAR ===== */
+.motivation-bar {
+  display: flex; gap: 10px; margin: 22px 0 22px;
+}
+.motivation-stat {
+  flex: 1; text-align: center; background: rgba(212,167,59,0.06); border: 1px solid var(--ink-line);
+  border-radius: 10px; padding: 12px 8px;
+}
+.motivation-num { display: block; font-family: var(--f-mono); font-size: 19px; color: var(--gold); }
+.motivation-label { font-size: 10.5px; color: var(--paper-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* ===== LIBRARY DATA ACTIONS ===== */
+.library-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.data-actions { display: flex; gap: 10px; }
+.data-actions .btn-secondary { flex: 1; text-align: center; }
+
+/* ===== MODE TABS (config screen) ===== */
+.mode-tabs { display: flex; gap: 8px; margin: 22px 0 24px; border-bottom: 1px solid var(--ink-line); }
+.mode-tab {
+  flex: 1; background: none; border: none; color: var(--paper-muted); font-family: var(--f-body);
+  font-size: 13.5px; padding: 10px 4px 14px; cursor: pointer; border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+}
+.mode-tab:hover { color: var(--card); }
+.mode-tab.is-active { color: var(--gold); border-bottom-color: var(--gold); font-weight: 600; }
+
+.exam-note { font-size: 12.5px; line-height: 1.55; color: var(--paper-muted); margin: 4px 0 20px; }
+.btn-stats-link { display: block; width: 100%; text-align: center; margin-top: 18px; }
+
+/* ===== TOPBAR TIMER (exam) ===== */
+.topbar-timer { font-family: var(--f-mono); font-size: 15px; color: var(--gold); }
+
+.round-badge-exam { background: var(--fog); color: var(--ink-deep); }
+
+/* selected option during exam — no correct/wrong reveal, just a pressed state */
+.option.is-selected { border-color: var(--gold); background: rgba(212,167,59,0.12); }
+.option.is-selected .option-letter { border-color: var(--gold); color: var(--gold); background: #fff; }
+
+/* ===== STATS SCREEN ===== */
+.stats-summary { display: flex; gap: 10px; margin: 22px 0 26px; }
+.stats-summary-item {
+  flex: 1; text-align: center; background: rgba(243,238,225,0.05); border: 1px solid var(--ink-line);
+  border-radius: 10px; padding: 14px 8px; display: flex; flex-direction: column; gap: 4px;
+}
+.stats-summary-num { font-family: var(--f-mono); font-size: 20px; color: var(--card); }
+.stats-summary-item span:last-child { font-size: 11px; color: var(--paper-muted); }
+.stats-sub { font-size: 13px; color: var(--paper-muted); margin: 0 0 12px; }
+.stats-list { display: flex; flex-direction: column; gap: 10px; }
+.stats-item { background: var(--card); border-radius: 10px; padding: 14px 16px; }
+.stats-item-q { font-family: var(--f-display); font-weight: 600; font-size: 14.5px; color: var(--paper-text); margin: 0 0 6px; }
+.stats-item-meta { font-size: 12.5px; color: var(--bad); margin: 0; }
+
 /* ===== NOTE BOX (giải thích) ===== */
 .note-box { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--card-line); }
 .note-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--paper-muted); margin: 0 0 6px; }
@@ -262,71 +314,10 @@ body {
 .note-edit-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .btn-sm { padding: 8px 14px; font-size: 13px; }
 
-/* ===== MOTIVATION BAR ===== */
-.motivation-bar {
-  display: flex; gap: 10px; margin: 0 0 22px;
-  background: rgba(243,238,225,0.05); border: 1px solid var(--ink-line); border-radius: 12px;
-  padding: 14px 10px;
-}
-.motivation-stat { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
-.motivation-num { font-family: var(--f-mono); font-size: 20px; color: var(--gold); }
-.motivation-label { font-size: 10.5px; color: var(--paper-muted); line-height: 1.3; }
-
-/* ===== DATA EXPORT/IMPORT ===== */
-.data-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
-.data-actions .btn-ghost { flex: 1; text-align: center; min-width: 140px; }
-
-/* ===== EXAM TIMER ===== */
-.exam-timer {
-  font-family: var(--f-mono); font-size: 13px; color: var(--gold);
-  border: 1px solid var(--gold); border-radius: 999px; padding: 3px 10px;
-}
-.exam-timer.exam-timer-warn { color: var(--bad); border-color: var(--bad); animation: timerPulse 1s infinite; }
-@keyframes timerPulse { 50% { opacity: 0.5; } }
-
-.setup-exam-hint { font-size: 12.5px; color: var(--paper-muted); margin: -18px 0 20px; line-height: 1.5; }
-
-/* ===== MANUAL QUESTION ENTRY ===== */
-.manual-textarea { resize: vertical; font-family: var(--f-body); }
-.manual-options-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 10px; }
-.manual-option-row { display: flex; align-items: center; gap: 10px; }
-.manual-option-row input[type="radio"] {
-  flex-shrink: 0; width: 18px; height: 18px; accent-color: var(--gold); cursor: pointer;
-}
-.manual-option-input { flex: 1; min-width: 0; }
-.manual-option-remove {
-  flex-shrink: 0; background: none; border: 1px solid var(--ink-line); color: var(--paper-muted);
-  width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 14px;
-  transition: border-color .15s, color .15s;
-}
-.manual-option-remove:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
-.manual-option-remove:disabled { opacity: 0.3; cursor: not-allowed; }
-
-.manual-editing-note {
-  font-size: 13px; color: var(--gold); background: rgba(212,167,59,0.08);
-  border: 1px solid var(--gold); border-radius: 8px; padding: 10px 14px; margin: 0 0 4px;
-}
-.manual-editing-note button { color: var(--gold); }
-.manual-added-count { font-size: 13px; color: var(--good); margin: 14px 0 0; text-align: center; }
-.manual-list-title {
-  font-family: var(--f-display); font-weight: 600; font-size: 17px; color: var(--card);
-  margin: 34px 0 12px;
-}
-.manual-q-item-actions { display: flex; gap: 8px; margin-top: 10px; }
-.manual-q-item-actions button {
-  font-family: var(--f-body); font-size: 12.5px; background: none; border: 1px solid var(--card-line);
-  color: var(--paper-muted); padding: 6px 12px; border-radius: 7px; cursor: pointer; transition: border-color .15s, color .15s;
-}
-.manual-q-item-actions button:hover { border-color: var(--gold); color: var(--paper-text); }
-.manual-q-item-actions button.is-danger:hover { border-color: var(--bad); color: var(--bad); }
-
 @media (max-width: 480px) {
   .setup-title { font-size: 27px; }
   .result-score { font-size: 48px; }
   .setup-row { flex-direction: column; }
   .quiz-controls { flex-direction: column-reverse; }
   .subject-card { flex-wrap: wrap; }
-  .motivation-bar { flex-wrap: wrap; }
-  .motivation-stat { min-width: 40%; }
-  .data-actions .btn-ghost { flex: 1 1 100%; }
 }
