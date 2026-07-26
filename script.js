@@ -605,6 +605,7 @@
   el.btnOpenManage.addEventListener("click", openManage);
   el.btnManageMore.addEventListener("click", renderManagePage);
   el.btnManageBack.addEventListener("click", () => { showScreen("config"); openConfig(subject.id); });
+  el.btnAddQuestion.addEventListener("click", () => openEditor(null));
 
   // ---------- EDITOR screen (the add/edit form itself) ----------
   let editingId = null;
