@@ -36,6 +36,7 @@
     motivationBar: $("motivationBar"), streakNum: $("streakNum"),
     lifetimeSeen: $("lifetimeSeen"), lifetimeAcc: $("lifetimeAcc"),
     fileInput: $("fileInput"), fileInputImport: $("fileInputImport"),
+    btnCreateSubject: $("btnCreateSubject"),
     btnExport: $("btnExport"), setupError: $("setupError"),
 
     screenConfig: $("screenConfig"), btnBackToLibrary: $("btnBackToLibrary"),
@@ -423,11 +424,32 @@
   el.tabPractice.addEventListener("click", () => switchConfigTab("practice"));
   el.tabExam.addEventListener("click", () => switchConfigTab("exam"));
 
-  function openConfig(id) {
+  function loadSubjectState(id) {
     const questions = getSubjectQuestions(id);
     const meta = library.find((s) => s.id === id);
     subject = { id, name: meta ? meta.name : id, questions };
     notes = loadNotes(id);
+  }
+
+  el.btnCreateSubject.addEventListener("click", () => {
+    const name = (prompt("Đặt tên cho môn học mới:") || "").trim();
+    if (!name) return;
+    let entry;
+    try {
+      entry = addSubjectToLibrary(name, []);
+    } catch (err) {
+      setError(err.message);
+      return;
+    }
+    setError("");
+    renderLibrary();
+    loadSubjectState(entry.id);
+    openManage();
+  });
+
+  function openConfig(id) {
+    loadSubjectState(id);
+    const questions = subject.questions;
     switchConfigTab("practice");
 
     el.configTitle.textContent = subject.name;

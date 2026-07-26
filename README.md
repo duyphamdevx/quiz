@@ -54,7 +54,12 @@ Lưu ý khi gõ trong JSON: mỗi dấu `\` trong LaTeX phải gõ thành `\\` (
 
 ## 4. Thêm môn học mới
 
-Ở màn hình đầu, bấm **"+ Thêm môn học mới"**, chọn file `.json`. Định dạng mỗi câu hỏi:
+Có hai cách:
+
+- **Nhập tay hoàn toàn** — bấm "+ Tạo môn học mới (nhập tay)" ở màn hình đầu, đặt tên môn, app sẽ tạo một môn rỗng và đưa thẳng vào màn "Thêm câu hỏi mới" để bạn gõ câu hỏi trực tiếp, không cần file JSON nào cả.
+- **Tải file JSON có sẵn** — bấm "+ Thêm môn học mới (tải file JSON)", chọn file `.json` đúng định dạng bên dưới.
+
+Định dạng mỗi câu hỏi trong file JSON:
 
 ```json
 {
