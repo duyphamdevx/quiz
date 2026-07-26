@@ -49,6 +49,7 @@ Lưu ý khi gõ trong JSON: mỗi dấu `\` trong LaTeX phải gõ thành `\\` (
 - **Thống kê câu sai luỹ kế** — bấm "📊 Xem thống kê câu sai" ở màn hình cấu hình môn để xem những câu bạn hay sai nhất tính dồn qua *tất cả* các lần học và thi (không chỉ phiên hiện tại), kèm tỉ lệ sai.
 - **Thanh động lực** — chuỗi ngày học liên tiếp, tổng số câu đã ôn, tỉ lệ đúng chung — hiện ngay ở màn hình danh sách môn.
 - **Xuất/nhập dữ liệu** — nút "⭱ Xuất dữ liệu" tải về một file JSON chứa toàn bộ môn học, ghi chú, thống kê, lịch sử thi của bạn để backup hoặc chuyển sang máy khác; "⭳ Nhập dữ liệu" nạp lại file đó (môn trùng tên sẽ được thêm bản mới, không ghi đè môn đang có).
+- **Thêm / sửa / xoá câu hỏi thủ công ngay trong app** — nút "✎ Thêm / sửa / xoá câu hỏi thủ công" ở màn hình cấu hình môn, không cần đụng vào file JSON. Sửa nội dung không làm mất ghi chú/thống kê đã có của câu đó (vì id câu hỏi giữ nguyên). Câu hỏi có nhiều đáp án đúng (dạng mảng trong JSON) chỉ xoá được qua giao diện, muốn sửa nội dung phải sửa trực tiếp trong file JSON để tránh vô tình làm mất bớt đáp án đúng.
 - Tự lưu phiên đang học dở, kể cả đang ở giữa vòng.
 
 ## 4. Thêm môn học mới

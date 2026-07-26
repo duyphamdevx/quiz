@@ -293,6 +293,35 @@ body {
 .stats-item-q { font-family: var(--f-display); font-weight: 600; font-size: 14.5px; color: var(--paper-text); margin: 0 0 6px; }
 .stats-item-meta { font-size: 12.5px; color: var(--bad); margin: 0; }
 
+/* ===== MANAGE QUESTIONS (manual add/edit/delete) ===== */
+.manage-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.manage-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  background: rgba(243,238,225,0.05); border: 1px solid var(--ink-line); border-radius: 10px; padding: 14px 16px;
+}
+.manage-item-main { flex: 1; min-width: 0; }
+.manage-item-cat { font-size: 11px; color: var(--gold); text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 4px; }
+.manage-item-q { font-size: 14px; color: var(--card); margin: 0; line-height: 1.5; }
+.manage-item-actions { flex-shrink: 0; display: flex; gap: 6px; }
+.manage-item-actions button {
+  background: none; border: 1px solid var(--ink-line); color: var(--fog); font-size: 12.5px;
+  padding: 7px 11px; border-radius: 7px; cursor: pointer; transition: border-color .15s, color .15s;
+}
+.manage-item-actions button:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+.manage-item-actions button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ===== QUESTION EDITOR ===== */
+.editor-field { margin-bottom: 18px; }
+.edit-options-list { display: flex; flex-direction: column; gap: 8px; }
+.edit-option-row { display: flex; align-items: center; gap: 10px; }
+.edit-option-row input[type="radio"] { flex-shrink: 0; width: 18px; height: 18px; accent-color: var(--gold); cursor: pointer; }
+.edit-option-text { flex: 1; }
+.edit-option-remove {
+  flex-shrink: 0; background: none; border: none; color: var(--paper-muted); font-size: 16px;
+  cursor: pointer; padding: 6px; border-radius: 6px; line-height: 1;
+}
+.edit-option-remove:hover { color: var(--bad); background: rgba(166,85,46,0.1); }
+
 /* ===== NOTE BOX (giải thích) ===== */
 .note-box { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--card-line); }
 .note-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--paper-muted); margin: 0 0 6px; }

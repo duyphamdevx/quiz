@@ -46,10 +46,19 @@
     btnStart: $("btnStart"),
     setupResume: $("setupResume"), resumeProgress: $("resumeProgress"), btnResume: $("btnResume"),
     examCategorySelect: $("examCategorySelect"), examCount: $("examCount"), examMinutes: $("examMinutes"),
-    btnStartExam: $("btnStartExam"), btnOpenStats: $("btnOpenStats"),
+    btnStartExam: $("btnStartExam"), btnOpenStats: $("btnOpenStats"), btnOpenManage: $("btnOpenManage"),
 
     screenStats: $("screenStats"), btnStatsBack: $("btnStatsBack"), statsTitle: $("statsTitle"),
     statsSummary: $("statsSummary"), statsList: $("statsList"), btnStatsMore: $("btnStatsMore"),
+
+    screenManage: $("screenManage"), btnManageBack: $("btnManageBack"), manageTitle: $("manageTitle"),
+    btnAddQuestion: $("btnAddQuestion"), manageList: $("manageList"), btnManageMore: $("btnManageMore"),
+
+    screenEditor: $("screenEditor"), btnEditorBack: $("btnEditorBack"), editorTitle: $("editorTitle"),
+    editCategory: $("editCategory"), editQuestion: $("editQuestion"),
+    editOptionsList: $("editOptionsList"), btnAddOption: $("btnAddOption"),
+    editExplanation: $("editExplanation"), editorError: $("editorError"),
+    btnSaveQuestion: $("btnSaveQuestion"), btnDeleteQuestion: $("btnDeleteQuestion"),
 
     screenQuiz: $("screenQuiz"), roundBadge: $("roundBadge"),
     quizCurrent: $("quizCurrent"), quizTotal: $("quizTotal"), quizCat: $("quizCat"),
@@ -248,6 +257,8 @@
     el.screenLibrary.hidden = name !== "library";
     el.screenConfig.hidden = name !== "config";
     el.screenStats.hidden = name !== "stats";
+    el.screenManage.hidden = name !== "manage";
+    el.screenEditor.hidden = name !== "editor";
     el.screenQuiz.hidden = name !== "quiz";
     el.screenRoundComplete.hidden = name !== "roundComplete";
     el.screenResult.hidden = name !== "result";
@@ -513,6 +524,154 @@
   el.btnOpenStats.addEventListener("click", openStats);
   el.btnStatsMore.addEventListener("click", renderStatsPage);
   el.btnStatsBack.addEventListener("click", () => showScreen("config"));
+
+  // ---------- MANAGE screen (manual add / edit / delete questions) ----------
+  let manageShown = 0;
+
+  function syncSubjectCount() {
+    const meta = library.find((s) => s.id === subject.id);
+    if (meta) { meta.count = subject.questions.length; saveLibrary(); }
+  }
+
+  function persistSubjectQuestions() {
+    safeSet(subjectDataKey(subject.id), JSON.stringify(subject.questions));
+    syncSubjectCount();
+  }
+
+  function openManage() {
+    el.manageTitle.textContent = `Câu hỏi — ${subject.name}`;
+    manageShown = 0;
+    el.manageList.innerHTML = "";
+    el.btnManageMore.hidden = subject.questions.length === 0;
+    showScreen("manage");
+    if (subject.questions.length) renderManagePage();
+  }
+
+  function renderManagePage() {
+    const slice = subject.questions.slice(manageShown, manageShown + REVIEW_PAGE_SIZE);
+    const frag = document.createDocumentFragment();
+    slice.forEach((q) => {
+      const multi = isMulti(q);
+      const div = document.createElement("div");
+      div.className = "manage-item";
+      div.innerHTML = `
+        <div class="manage-item-main">
+          <p class="manage-item-cat">${escapeHtml(q.category)}</p>
+          <p class="manage-item-q">${escapeHtml(q.question)}</p>
+        </div>
+        <div class="manage-item-actions">
+          <button class="btn-edit" ${multi ? "disabled title=\"Câu nhiều đáp án đúng — sửa trực tiếp trong file JSON\"" : ""}>Sửa</button>
+          <button class="btn-del">Xoá</button>
+        </div>
+      `;
+      div.querySelector(".btn-edit").addEventListener("click", () => { if (!multi) openEditor(q); });
+      div.querySelector(".btn-del").addEventListener("click", () => {
+        if (confirm("Xoá câu hỏi này? Ghi chú và thống kê của câu này cũng sẽ không còn dùng được.")) {
+          subject.questions = subject.questions.filter((qq) => qq.id !== q.id);
+          persistSubjectQuestions();
+          openManage();
+        }
+      });
+      frag.appendChild(div);
+    });
+    el.manageList.appendChild(frag);
+    manageShown += slice.length;
+    el.btnManageMore.hidden = manageShown >= subject.questions.length;
+    renderMath(el.manageList);
+  }
+
+  el.btnOpenManage.addEventListener("click", openManage);
+  el.btnManageMore.addEventListener("click", renderManagePage);
+  el.btnManageBack.addEventListener("click", () => { showScreen("config"); openConfig(subject.id); });
+
+  // ---------- EDITOR screen (the add/edit form itself) ----------
+  let editingId = null;
+  let editorOptions = [];
+  let editorCorrectIndex = 0;
+
+  function genQuestionId() { return `custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`; }
+
+  function openEditor(question) {
+    editingId = question ? question.id : null;
+    el.editorTitle.textContent = question ? "Sửa câu hỏi" : "Thêm câu hỏi mới";
+    el.editCategory.value = question ? question.category : "";
+    el.editQuestion.value = question ? question.question : "";
+    editorOptions = question ? question.options.slice() : ["", ""];
+    editorCorrectIndex = question ? question.answer : 0;
+    el.editExplanation.value = question ? question.explanation : "";
+    el.btnDeleteQuestion.hidden = !question;
+    setError2("");
+    renderEditorOptions();
+    showScreen("editor");
+  }
+
+  function setError2(msg) {
+    if (!msg) { el.editorError.hidden = true; el.editorError.textContent = ""; return; }
+    el.editorError.hidden = false; el.editorError.textContent = msg;
+  }
+
+  function renderEditorOptions() {
+    el.editOptionsList.innerHTML = "";
+    editorOptions.forEach((text, i) => {
+      const row = document.createElement("div");
+      row.className = "edit-option-row";
+      row.innerHTML = `
+        <input type="radio" name="correctAnswer" ${i === editorCorrectIndex ? "checked" : ""}>
+        <input type="text" class="field-control edit-option-text" value="${escapeHtml(text)}" placeholder="Đáp án ${i + 1}">
+        <button type="button" class="edit-option-remove" ${editorOptions.length <= 2 ? "disabled" : ""}>✕</button>
+      `;
+      row.querySelector('input[type="radio"]').addEventListener("change", () => { editorCorrectIndex = i; });
+      row.querySelector(".edit-option-text").addEventListener("input", (e) => { editorOptions[i] = e.target.value; });
+      row.querySelector(".edit-option-remove").addEventListener("click", () => {
+        if (editorOptions.length <= 2) return;
+        editorOptions.splice(i, 1);
+        if (editorCorrectIndex >= editorOptions.length) editorCorrectIndex = editorOptions.length - 1;
+        else if (editorCorrectIndex > i) editorCorrectIndex--;
+        renderEditorOptions();
+      });
+      el.editOptionsList.appendChild(row);
+    });
+  }
+
+  el.btnAddOption.addEventListener("click", () => { editorOptions.push(""); renderEditorOptions(); });
+
+  el.btnSaveQuestion.addEventListener("click", () => {
+    const category = el.editCategory.value.trim() || "Chung";
+    const questionText = el.editQuestion.value.trim();
+    const options = editorOptions.map((t) => t.trim());
+
+    if (!questionText) { setError2("Chưa nhập nội dung câu hỏi."); return; }
+    if (options.some((t) => !t)) { setError2("Mỗi đáp án cần có nội dung (không để trống)."); return; }
+    if (options.length < 2) { setError2("Cần ít nhất 2 đáp án."); return; }
+
+    const newQ = {
+      id: editingId || genQuestionId(),
+      category, question: questionText, options,
+      answer: editorCorrectIndex,
+      explanation: el.editExplanation.value.trim(),
+    };
+
+    if (editingId) {
+      const idx = subject.questions.findIndex((q) => q.id === editingId);
+      if (idx !== -1) subject.questions[idx] = newQ;
+    } else {
+      subject.questions.push(newQ);
+    }
+    persistSubjectQuestions();
+    showScreen("manage");
+    openManage();
+  });
+
+  el.btnDeleteQuestion.addEventListener("click", () => {
+    if (!editingId) return;
+    if (!confirm("Xoá câu hỏi này?")) return;
+    subject.questions = subject.questions.filter((q) => q.id !== editingId);
+    persistSubjectQuestions();
+    showScreen("manage");
+    openManage();
+  });
+
+  el.btnEditorBack.addEventListener("click", () => showScreen("manage"));
 
   // ---------- PRACTICE quiz (round loop) ----------
   function currentQuestion() { return subject.questions[sess.currentRoundOrder[sess.pos]]; }

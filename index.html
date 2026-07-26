@@ -136,6 +136,50 @@
       </div>
 
       <button class="btn-ghost btn-stats-link" id="btnOpenStats">📊 Xem thống kê câu sai của môn này</button>
+      <button class="btn-ghost btn-stats-link" id="btnOpenManage">✎ Thêm / sửa / xoá câu hỏi thủ công</button>
+    </div>
+  </section>
+
+  <!-- ===== SCREEN: MANAGE (danh sách câu hỏi để sửa/xoá/thêm thủ công) ===== -->
+  <section class="screen" id="screenManage" hidden>
+    <div class="setup-wrap">
+      <button class="btn-ghost btn-back" id="btnManageBack">← Quay lại</button>
+      <h1 class="setup-title" id="manageTitle">Quản lý câu hỏi</h1>
+      <button class="btn-primary" id="btnAddQuestion" style="margin-bottom:22px;">+ Thêm câu hỏi mới</button>
+      <div class="manage-list" id="manageList"></div>
+      <button class="btn-ghost" id="btnManageMore" hidden>Xem thêm</button>
+    </div>
+  </section>
+
+  <!-- ===== SCREEN: EDITOR (thêm / sửa 1 câu hỏi) ===== -->
+  <section class="screen" id="screenEditor" hidden>
+    <div class="setup-wrap">
+      <button class="btn-ghost btn-back" id="btnEditorBack">← Huỷ</button>
+      <h1 class="setup-title" id="editorTitle">Thêm câu hỏi mới</h1>
+
+      <div class="field editor-field">
+        <label class="field-label">Chương / chủ đề</label>
+        <input type="text" id="editCategory" class="field-control" placeholder="VD: Chương 1">
+      </div>
+      <div class="field editor-field">
+        <label class="field-label">Câu hỏi (hỗ trợ công thức toán LaTeX, ví dụ \\(x^2\\))</label>
+        <textarea id="editQuestion" class="note-textarea" rows="3" placeholder="Nội dung câu hỏi..."></textarea>
+      </div>
+
+      <p class="field-label" style="margin-bottom:10px;">Đáp án — chọn nút tròn cho đáp án đúng</p>
+      <div id="editOptionsList" class="edit-options-list"></div>
+      <button class="btn-secondary btn-sm" id="btnAddOption" style="margin:10px 0 22px;">+ Thêm đáp án</button>
+
+      <div class="field editor-field">
+        <label class="field-label">Giải thích mặc định (không bắt buộc)</label>
+        <textarea id="editExplanation" class="note-textarea" rows="2" placeholder="Giải thích..."></textarea>
+      </div>
+
+      <p class="setup-error" id="editorError" hidden></p>
+      <div class="result-actions">
+        <button class="btn-primary" id="btnSaveQuestion">Lưu câu hỏi</button>
+        <button class="btn-secondary" id="btnDeleteQuestion" hidden>Xoá câu này</button>
+      </div>
     </div>
   </section>
 
