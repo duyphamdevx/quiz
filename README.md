@@ -37,7 +37,9 @@ Vài ký hiệu LaTeX hay dùng:
 - Đạo hàm riêng: `\frac{\partial f}{\partial x}`
 - Vô cực, tổng, tích phân: `\infty`, `\sum_{i=1}^{n}`, `\int_{a}^{b}`
 
-Lưu ý khi gõ trong JSON: mỗi dấu `\` trong LaTeX phải gõ thành `\\` (hai dấu gạch chéo) vì JSON dùng `\` làm ký tự thoát — ví dụ `\frac` viết thành `\\frac`. Công thức trong `options` và trong `explanation` cũng render được tương tự. Có thể dán thử ở [jsonlint.com](https://jsonlint.com) để kiểm tra JSON hợp lệ trước khi lưu.
+Lưu ý khi gõ trong JSON: mỗi dấu `\` trong LaTeX phải gõ thành `\\` (hai dấu gạch chéo) vì JSON dùng `\` làm ký tự thoát — ví dụ `\frac` viết thành `\\frac`. Công thức trong `options` và trong `explanation` cũng render được tương tự.
+
+Khi thêm/sửa câu hỏi thủ công trong app (mục 4), mỗi ô — câu hỏi, từng đáp án, giải thích — đều có **khung xem trước công thức ngay bên dưới**, cập nhật theo thời gian thực khi gõ, để kiểm tra công thức hiển thị đúng trước khi lưu.
 
 ## 3. Tính năng chính
 
@@ -49,6 +51,7 @@ Lưu ý khi gõ trong JSON: mỗi dấu `\` trong LaTeX phải gõ thành `\\` (
 - **Thống kê câu sai luỹ kế** — bấm "📊 Xem thống kê câu sai" ở màn hình cấu hình môn để xem những câu bạn hay sai nhất tính dồn qua *tất cả* các lần học và thi (không chỉ phiên hiện tại), kèm tỉ lệ sai.
 - **Thanh động lực** — chuỗi ngày học liên tiếp, tổng số câu đã ôn, tỉ lệ đúng chung — hiện ngay ở màn hình danh sách môn.
 - **Xuất/nhập dữ liệu** — nút "⭱ Xuất dữ liệu" tải về một file JSON chứa toàn bộ môn học, ghi chú, thống kê, lịch sử thi của bạn để backup hoặc chuyển sang máy khác; "⭳ Nhập dữ liệu" nạp lại file đó (môn trùng tên sẽ được thêm bản mới, không ghi đè môn đang có).
+- **Dán nhanh câu hỏi từ JSON** — trong màn "Thêm câu hỏi mới", bấm "📋 Dán nhanh từ JSON", dán một object JSON đúng định dạng (`question`, `options`, `answer`...) là app tự điền vào form để bạn xem lại và lưu; dán cả một **mảng** nhiều câu sẽ thêm hàng loạt luôn, không cần review từng câu.
 - **Thêm / sửa / xoá câu hỏi thủ công ngay trong app** — nút "✎ Thêm / sửa / xoá câu hỏi thủ công" ở màn hình cấu hình môn, không cần đụng vào file JSON. Sửa nội dung không làm mất ghi chú/thống kê đã có của câu đó (vì id câu hỏi giữ nguyên). Câu hỏi có nhiều đáp án đúng (dạng mảng trong JSON) chỉ xoá được qua giao diện, muốn sửa nội dung phải sửa trực tiếp trong file JSON để tránh vô tình làm mất bớt đáp án đúng.
 - Tự lưu phiên đang học dở, kể cả đang ở giữa vòng.
 

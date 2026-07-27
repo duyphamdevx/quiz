@@ -56,10 +56,12 @@
     btnAddQuestion: $("btnAddQuestion"), manageList: $("manageList"), btnManageMore: $("btnManageMore"),
 
     screenEditor: $("screenEditor"), btnEditorBack: $("btnEditorBack"), editorTitle: $("editorTitle"),
-    editCategory: $("editCategory"), editQuestion: $("editQuestion"),
+    editCategory: $("editCategory"), editQuestion: $("editQuestion"), questionPreview: $("questionPreview"),
     editOptionsList: $("editOptionsList"), btnAddOption: $("btnAddOption"),
-    editExplanation: $("editExplanation"), editorError: $("editorError"),
+    editExplanation: $("editExplanation"), explanationPreview: $("explanationPreview"), editorError: $("editorError"),
     btnSaveQuestion: $("btnSaveQuestion"), btnDeleteQuestion: $("btnDeleteQuestion"),
+    btnTogglePaste: $("btnTogglePaste"), jsonPastePanel: $("jsonPastePanel"), jsonPasteArea: $("jsonPasteArea"),
+    btnCancelPaste: $("btnCancelPaste"), btnApplyPaste: $("btnApplyPaste"), pasteError: $("pasteError"),
 
     screenQuiz: $("screenQuiz"), roundBadge: $("roundBadge"),
     quizCurrent: $("quizCurrent"), quizTotal: $("quizTotal"), quizCat: $("quizCat"),
@@ -623,8 +625,12 @@
     editorCorrectIndex = question ? question.answer : 0;
     el.editExplanation.value = question ? question.explanation : "";
     el.btnDeleteQuestion.hidden = !question;
+    el.jsonPastePanel.hidden = true;
     setError2("");
+    setPasteError("");
     renderEditorOptions();
+    updateQuestionPreview();
+    updateExplanationPreview();
     showScreen("editor");
   }
 
@@ -633,18 +639,43 @@
     el.editorError.hidden = false; el.editorError.textContent = msg;
   }
 
+  function updateLatexPreview(inputEl, previewEl) {
+    const v = inputEl.value;
+    if (v.trim()) {
+      previewEl.innerHTML = escapeHtml(v);
+      renderMath(previewEl);
+      previewEl.hidden = false;
+    } else {
+      previewEl.hidden = true;
+    }
+  }
+
+  function updateQuestionPreview() { updateLatexPreview(el.editQuestion, el.questionPreview); }
+  function updateExplanationPreview() { updateLatexPreview(el.editExplanation, el.explanationPreview); }
+  el.editQuestion.addEventListener("input", updateQuestionPreview);
+  el.editExplanation.addEventListener("input", updateExplanationPreview);
+
   function renderEditorOptions() {
     el.editOptionsList.innerHTML = "";
     editorOptions.forEach((text, i) => {
       const row = document.createElement("div");
       row.className = "edit-option-row";
       row.innerHTML = `
-        <input type="radio" name="correctAnswer" ${i === editorCorrectIndex ? "checked" : ""}>
-        <input type="text" class="field-control edit-option-text" value="${escapeHtml(text)}" placeholder="Đáp án ${i + 1}">
-        <button type="button" class="edit-option-remove" ${editorOptions.length <= 2 ? "disabled" : ""}>✕</button>
+        <div class="edit-option-row-top">
+          <input type="radio" name="correctAnswer" ${i === editorCorrectIndex ? "checked" : ""}>
+          <input type="text" class="field-control edit-option-text" value="${escapeHtml(text)}" placeholder="Đáp án ${i + 1}">
+          <button type="button" class="edit-option-remove" ${editorOptions.length <= 2 ? "disabled" : ""}>✕</button>
+        </div>
+        <div class="latex-preview latex-preview-sm" hidden></div>
       `;
+      const textInput = row.querySelector(".edit-option-text");
+      const preview = row.querySelector(".latex-preview");
+      updateLatexPreview(textInput, preview);
       row.querySelector('input[type="radio"]').addEventListener("change", () => { editorCorrectIndex = i; });
-      row.querySelector(".edit-option-text").addEventListener("input", (e) => { editorOptions[i] = e.target.value; });
+      textInput.addEventListener("input", (e) => {
+        editorOptions[i] = e.target.value;
+        updateLatexPreview(textInput, preview);
+      });
       row.querySelector(".edit-option-remove").addEventListener("click", () => {
         if (editorOptions.length <= 2) return;
         editorOptions.splice(i, 1);
@@ -657,6 +688,70 @@
   }
 
   el.btnAddOption.addEventListener("click", () => { editorOptions.push(""); renderEditorOptions(); });
+
+  // ---------- Quick JSON paste (fills the form, or bulk-imports an array) ----------
+  function setPasteError(msg) {
+    if (!msg) { el.pasteError.hidden = true; el.pasteError.textContent = ""; return; }
+    el.pasteError.hidden = false; el.pasteError.textContent = msg;
+  }
+  function validateRawQuestion(q, i) {
+    const label = i !== null ? `Câu ${i + 1}` : "Câu hỏi";
+    if (!q || typeof q.question !== "string" || !Array.isArray(q.options)) {
+      throw new Error(`${label} thiếu "question" hoặc "options".`);
+    }
+    if (q.answer === undefined) throw new Error(`${label} thiếu "answer".`);
+  }
+
+  el.btnTogglePaste.addEventListener("click", () => {
+    el.jsonPasteArea.value = "";
+    setPasteError("");
+    el.jsonPastePanel.hidden = false;
+    el.jsonPasteArea.focus();
+  });
+  el.btnCancelPaste.addEventListener("click", () => { el.jsonPastePanel.hidden = true; });
+
+  el.btnApplyPaste.addEventListener("click", () => {
+    let data;
+    try { data = JSON.parse(el.jsonPasteArea.value); }
+    catch (e) { setPasteError("JSON không hợp lệ: " + e.message); return; }
+
+    try {
+      if (Array.isArray(data)) {
+        data.forEach((q, i) => validateRawQuestion(q, i));
+        const existingIds = new Set(subject.questions.map((q) => q.id));
+        const added = data.map((q) => {
+          let id = q.id !== undefined ? String(q.id) : genQuestionId();
+          if (existingIds.has(id)) id = genQuestionId();
+          existingIds.add(id);
+          return {
+            id, category: q.category || "Chung", question: q.question,
+            options: q.options, answer: q.answer, explanation: q.explanation || "",
+          };
+        });
+        subject.questions = subject.questions.concat(added);
+        persistSubjectQuestions();
+        alert(`Đã thêm ${added.length} câu hỏi.`);
+        showScreen("manage");
+        openManage();
+      } else {
+        validateRawQuestion(data, null);
+        let ci = Array.isArray(data.answer) ? data.answer[0] : data.answer;
+        if (typeof ci !== "number" || ci < 0 || ci >= data.options.length) ci = 0;
+        el.editCategory.value = data.category || "";
+        el.editQuestion.value = data.question;
+        editorOptions = data.options.slice();
+        editorCorrectIndex = ci;
+        el.editExplanation.value = data.explanation || "";
+        renderEditorOptions();
+        updateQuestionPreview();
+        updateExplanationPreview();
+        el.jsonPastePanel.hidden = true;
+        setPasteError("");
+      }
+    } catch (e) {
+      setPasteError(e.message);
+    }
+  });
 
   el.btnSaveQuestion.addEventListener("click", () => {
     const category = el.editCategory.value.trim() || "Chung";

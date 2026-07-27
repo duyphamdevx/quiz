@@ -158,6 +158,18 @@
       <button class="btn-ghost btn-back" id="btnEditorBack">← Huỷ</button>
       <h1 class="setup-title" id="editorTitle">Thêm câu hỏi mới</h1>
 
+      <div class="json-paste-toggle">
+        <button type="button" class="btn-ghost btn-sm" id="btnTogglePaste">📋 Dán nhanh từ JSON</button>
+      </div>
+      <div class="json-paste-panel" id="jsonPastePanel" hidden>
+        <textarea id="jsonPasteArea" class="note-textarea" rows="5" placeholder='Dán JSON 1 câu hỏi, ví dụ: {"question": "...", "options": ["A","B"], "answer": 0} — hoặc dán cả một mảng nhiều câu để thêm hàng loạt.'></textarea>
+        <p class="setup-error" id="pasteError" hidden></p>
+        <div class="note-edit-actions">
+          <button class="btn-secondary btn-sm" id="btnCancelPaste">Huỷ</button>
+          <button class="btn-primary btn-sm" id="btnApplyPaste">Áp dụng</button>
+        </div>
+      </div>
+
       <div class="field editor-field">
         <label class="field-label">Chương / chủ đề</label>
         <input type="text" id="editCategory" class="field-control" placeholder="VD: Chương 1">
@@ -165,15 +177,17 @@
       <div class="field editor-field">
         <label class="field-label">Câu hỏi (hỗ trợ công thức toán LaTeX, ví dụ \\(x^2\\))</label>
         <textarea id="editQuestion" class="note-textarea" rows="3" placeholder="Nội dung câu hỏi..."></textarea>
+        <div class="latex-preview" id="questionPreview" hidden></div>
       </div>
 
-      <p class="field-label" style="margin-bottom:10px;">Đáp án — chọn nút tròn cho đáp án đúng</p>
+      <p class="field-label" style="margin-bottom:10px;">Đáp án — chọn nút tròn cho đáp án đúng (cũng hỗ trợ LaTeX)</p>
       <div id="editOptionsList" class="edit-options-list"></div>
       <button class="btn-secondary btn-sm" id="btnAddOption" style="margin:10px 0 22px;">+ Thêm đáp án</button>
 
       <div class="field editor-field">
         <label class="field-label">Giải thích mặc định (không bắt buộc)</label>
         <textarea id="editExplanation" class="note-textarea" rows="2" placeholder="Giải thích..."></textarea>
+        <div class="latex-preview" id="explanationPreview" hidden></div>
       </div>
 
       <p class="setup-error" id="editorError" hidden></p>
