@@ -10,7 +10,7 @@
   const examHistoryKey = (id) => `boDeQuiz.examhistory.${id}`;
   const WAIT_ENTER_KEY = "boDeQuiz.waitForEnter.v1";
 
-  const REVIEW_PAGE_SIZE = 20;
+  const REVIEW_PAGE_SIZE = 300;
   const MANAGE_PAGE_SIZE = 300; // số câu hiển thị mỗi lần bấm "Xem thêm" ở danh sách quản lý câu hỏi
 
   // ---------- State ----------
