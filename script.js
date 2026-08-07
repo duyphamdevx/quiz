@@ -8,6 +8,7 @@
   const sessionKey = (id) => `boDeQuiz.session.${id}`;
   const statsKey = (id) => `boDeQuiz.stats.${id}`;
   const examHistoryKey = (id) => `boDeQuiz.examhistory.${id}`;
+  const WAIT_ENTER_KEY = "boDeQuiz.waitForEnter.v1";
 
   const REVIEW_PAGE_SIZE = 20;
 
@@ -69,6 +70,7 @@
     screenQuiz: $("screenQuiz"), roundBadge: $("roundBadge"),
     quizCurrent: $("quizCurrent"), quizTotal: $("quizTotal"), quizCat: $("quizCat"),
     progressFill: $("progressFill"),
+    toggleWaitEnter: $("toggleWaitEnter"),
     card: $("card"), cardQuestion: $("cardQuestion"), cardOptions: $("cardOptions"),
     btnEditCurrentQuestion: $("btnEditCurrentQuestion"), quizInlineEditPanel: $("quizInlineEditPanel"),
     quizEditQuestion: $("quizEditQuestion"), quizEditOptionsList: $("quizEditOptionsList"),
@@ -146,6 +148,14 @@
   function safeGet(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
   function safeSet(key, val) { try { localStorage.setItem(key, val); return true; } catch (e) { return false; } }
   function safeRemove(key) { try { localStorage.removeItem(key); } catch (e) {} }
+
+  // ---------- Setting: dừng lại chờ Enter sau mỗi câu (mặc định bật) ----------
+  function loadWaitForEnterSetting() {
+    const v = safeGet(WAIT_ENTER_KEY);
+    return v === null ? true : v === "1";
+  }
+  function saveWaitForEnterSetting(val) { safeSet(WAIT_ENTER_KEY, val ? "1" : "0"); }
+  function waitForEnterEnabled() { return el.toggleWaitEnter ? el.toggleWaitEnter.checked : true; }
 
   function normalizeQuestions(raw) {
     if (!Array.isArray(raw)) throw new Error("File JSON phải là một mảng câu hỏi.");
@@ -1029,8 +1039,13 @@
     closeQuizInlineEditor();
     el.btnEditCurrentQuestion.disabled = true;
 
-    showNoteBox(q);
-    saveSession();
+    if (waitForEnterEnabled()) {
+      showNoteBox(q);
+      saveSession();
+    } else {
+      saveSession();
+      setTimeout(() => { if (!isReviewingPastQuestion()) advance(); }, 350);
+    }
   }
 
   function skipQuestion() {
@@ -1043,6 +1058,13 @@
       recordAnswerStat(subject.id, q.id, false);
     }
     advance();
+  }
+
+  if (el.toggleWaitEnter) {
+    el.toggleWaitEnter.checked = loadWaitForEnterSetting();
+    el.toggleWaitEnter.addEventListener("change", () => {
+      saveWaitForEnterSetting(el.toggleWaitEnter.checked);
+    });
   }
 
   el.btnPrev.addEventListener("click", () => {
