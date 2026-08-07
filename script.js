@@ -289,7 +289,19 @@
       s.reviewMode = false;
       s.reviewPos = null;
     }
+    if (!Array.isArray(s.optionOrders)) s.optionOrders = [];
     return s;
+  }
+  // Trả về (và nếu cần, tạo mới) thứ tự hiển thị đáp án đã xáo trộn cho vị trí pos
+  // trong vòng hiện tại. Được lưu lại trong sess để giữ nguyên khi re-render/resume.
+  function getOptionOrder(pos, q) {
+    if (!Array.isArray(sess.optionOrders)) sess.optionOrders = [];
+    let order = sess.optionOrders[pos];
+    if (!Array.isArray(order) || order.length !== q.options.length) {
+      order = shuffle(q.options.map((_, i) => i));
+      sess.optionOrders[pos] = order;
+    }
+    return order;
   }
   function saveSession() { if (subject && sess) safeSet(sessionKey(subject.id), JSON.stringify(sess)); }
   function clearSession() { if (subject) safeRemove(sessionKey(subject.id)); }
@@ -536,6 +548,7 @@
       reviewPos: null,
       firstRoundCorrectCount: 0,
       originalSetLength: originalSet.length,
+      optionOrders: [],
     };
     saveSession();
     showScreen("quiz");
@@ -1031,11 +1044,13 @@
     const correctSet = new Set(multi ? q.answer : [q.answer]);
 
     el.cardOptions.innerHTML = "";
-    q.options.forEach((optText, i) => {
+    const optOrder = getOptionOrder(viewPos, q);
+    optOrder.forEach((i, slot) => {
+      const optText = q.options[i];
       const btn = document.createElement("button");
       btn.className = "option";
       btn.type = "button";
-      btn.innerHTML = `<span class="option-letter">${i + 1}</span><span>${escapeHtml(optText)}</span>`;
+      btn.innerHTML = `<span class="option-letter">${slot + 1}</span><span>${escapeHtml(optText)}</span>`;
       if (reviewing || isAnswered) {
         btn.disabled = true;
         if (correctSet.has(i)) btn.classList.add("is-correct");
@@ -1057,13 +1072,15 @@
     if (answerRecordAt(sess.pos)) return;
     const optionBtns = Array.from(el.cardOptions.children);
     if (optionBtns[0].disabled) return;
+    const optOrder = getOptionOrder(sess.pos, q); // slot -> original option index
 
-    optionBtns.forEach((b, idx) => {
+    optionBtns.forEach((b, slot) => {
       b.disabled = true;
-      if (correctSet.has(idx)) b.classList.add("is-correct");
+      if (correctSet.has(optOrder[slot])) b.classList.add("is-correct");
     });
     const wasCorrect = correctSet.has(i);
-    if (!wasCorrect) optionBtns[i].classList.add("is-wrong");
+    const clickedSlot = optOrder.indexOf(i);
+    if (!wasCorrect && clickedSlot !== -1) optionBtns[clickedSlot].classList.add("is-wrong");
 
     if (wasCorrect) {
       if (sess.round === 1) sess.firstRoundCorrectCount++;
@@ -1218,6 +1235,7 @@
     sess.answerHistory = new Array(nextPool.length).fill(null);
     sess.reviewMode = false;
     sess.reviewPos = null;
+    sess.optionOrders = [];
   }
 
   el.btnNextRound.addEventListener("click", () => {
@@ -1276,11 +1294,13 @@
     const lastIds = new Set(lastExam ? lastExam.questionIds : []);
 
     const order = pickExamQuestions(pool, n, lastIds);
+    const optionOrders = order.map((qIdx) => shuffle(subject.questions[qIdx].options.map((_, i) => i)));
     examSess = {
       category, order, pos: 0,
       answers: new Array(order.length).fill(-1),
       durationSec: minutes * 60,
       endsAt: Date.now() + minutes * 60 * 1000,
+      optionOrders,
     };
     startExamTimer();
     showScreen("exam");
@@ -1320,11 +1340,14 @@
     el.examCardQuestion.innerHTML = escapeHtml(q.question);
 
     el.examCardOptions.innerHTML = "";
-    q.options.forEach((optText, i) => {
+    const optOrder = (Array.isArray(examSess.optionOrders) && examSess.optionOrders[examSess.pos]) ||
+      q.options.map((_, i) => i);
+    optOrder.forEach((i, slot) => {
+      const optText = q.options[i];
       const btn = document.createElement("button");
       btn.className = "option";
       btn.type = "button";
-      btn.innerHTML = `<span class="option-letter">${i + 1}</span><span>${escapeHtml(optText)}</span>`;
+      btn.innerHTML = `<span class="option-letter">${slot + 1}</span><span>${escapeHtml(optText)}</span>`;
       btn.addEventListener("click", () => selectExamOption(i, btn));
       el.examCardOptions.appendChild(btn);
     });
