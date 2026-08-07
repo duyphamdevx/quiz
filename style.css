@@ -331,6 +331,13 @@ input.field-control { cursor: text; }
 .note-textarea:focus-visible { outline: 2px solid var(--accent); }
 .note-edit-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
+.review-info {
+  margin-top: 20px; padding-top: 18px; border-top: 1px dashed var(--line);
+}
+.review-explanation {
+  font-size: 13px; color: var(--ink); margin: 6px 0 0; line-height: 1.55;
+}
+
 .quiz-controls { display: flex; justify-content: space-between; gap: 12px; margin-top: 26px; }
 .quiz-controls .btn-primary, .quiz-controls .btn-secondary { flex: 1; }
 

@@ -78,6 +78,9 @@
     btnEditNote: $("btnEditNote"), btnAddNote: $("btnAddNote"),
     noteEdit: $("noteEdit"), noteTextarea: $("noteTextarea"),
     btnCancelNote: $("btnCancelNote"), btnSaveNote: $("btnSaveNote"),
+    reviewInfo: $("reviewInfo"), reviewYourAnswer: $("reviewYourAnswer"),
+    reviewCorrectAnswer: $("reviewCorrectAnswer"), reviewExplanation: $("reviewExplanation"),
+    btnPrev: $("btnPrev"),
     btnSkip: $("btnSkip"), btnNext: $("btnNext"),
 
     screenRoundComplete: $("screenRoundComplete"), roundDoneEyebrow: $("roundDoneEyebrow"),
@@ -258,6 +261,25 @@
   // ---------- Session persistence (practice) ----------
   function loadSession(id) {
     try { return JSON.parse(safeGet(sessionKey(id)) || "null"); } catch (e) { return null; }
+  }
+  function normalizePracticeSession(raw) {
+    if (!raw || typeof raw !== "object") return raw;
+    const s = { ...raw };
+    const total = Array.isArray(s.currentRoundOrder) ? s.currentRoundOrder.length : 0;
+    if (!Number.isInteger(s.pos) || s.pos < 0) s.pos = 0;
+    if (s.pos > total) s.pos = total;
+    if (!Array.isArray(s.answerHistory)) s.answerHistory = new Array(total).fill(null);
+    if (s.answerHistory.length !== total) {
+      s.answerHistory = s.answerHistory.slice(0, total);
+      while (s.answerHistory.length < total) s.answerHistory.push(null);
+    }
+    s.reviewMode = !!s.reviewMode;
+    s.reviewPos = Number.isInteger(s.reviewPos) ? s.reviewPos : null;
+    if (!s.reviewMode || s.reviewPos === null || s.reviewPos < 0 || s.reviewPos >= s.pos) {
+      s.reviewMode = false;
+      s.reviewPos = null;
+    }
+    return s;
   }
   function saveSession() { if (subject && sess) safeSet(sessionKey(subject.id), JSON.stringify(sess)); }
   function clearSession() { if (subject) safeRemove(sessionKey(subject.id)); }
@@ -474,7 +496,7 @@
     if (savedSess) {
       el.setupResume.hidden = false;
       el.resumeProgress.textContent = `Vòng ${savedSess.round} — câu ${savedSess.pos + 1}/${savedSess.currentRoundOrder.length}`;
-      el.btnResume.onclick = () => { sess = savedSess; showScreen("quiz"); renderQuestion(); };
+      el.btnResume.onclick = () => { sess = normalizePracticeSession(savedSess); showScreen("quiz"); renderQuestion(); };
     } else {
       el.setupResume.hidden = true;
     }
@@ -499,6 +521,9 @@
       currentRoundOrder: originalSet,
       pos: 0,
       roundWrong: [],
+      answerHistory: new Array(originalSet.length).fill(null),
+      reviewMode: false,
+      reviewPos: null,
       firstRoundCorrectCount: 0,
       originalSetLength: originalSet.length,
     };
@@ -882,30 +907,74 @@
   });
 
   // ---------- PRACTICE quiz (round loop) ----------
-  function currentQuestion() { return subject.questions[sess.currentRoundOrder[sess.pos]]; }
+  function currentViewPos() {
+    if (sess.reviewMode && Number.isInteger(sess.reviewPos) && sess.reviewPos >= 0 && sess.reviewPos < sess.pos) {
+      return sess.reviewPos;
+    }
+    return sess.pos;
+  }
+  function currentQuestion() { return subject.questions[sess.currentRoundOrder[currentViewPos()]]; }
+  function answerRecordAt(pos) {
+    if (!sess || !Array.isArray(sess.answerHistory) || pos < 0 || pos >= sess.answerHistory.length) return null;
+    return sess.answerHistory[pos];
+  }
+  function isReviewingPastQuestion() {
+    return sess.reviewMode && currentViewPos() < sess.pos;
+  }
+  function answerText(q, selected) {
+    if (selected === -1) return "Bỏ qua";
+    if (!Number.isInteger(selected) || selected < 0 || selected >= q.options.length) return "Không có dữ liệu";
+    return q.options[selected];
+  }
+  function correctAnswerText(q) {
+    return isMulti(q) ? q.answer.map((a) => q.options[a]).join(", ") : q.options[q.answer];
+  }
+  function renderReviewInfo(q, selected) {
+    el.reviewYourAnswer.textContent = `Bạn chọn: ${answerText(q, selected)}`;
+    el.reviewCorrectAnswer.textContent = `Đáp án đúng: ${correctAnswerText(q)}`;
+    el.reviewExplanation.textContent = `Giải thích: ${q.explanation || "Chưa có giải thích cho câu này."}`;
+    el.reviewInfo.hidden = false;
+    renderMath(el.reviewInfo);
+  }
 
   function renderQuestion() {
+    sess = normalizePracticeSession(sess);
     const q = currentQuestion();
+    const viewPos = currentViewPos();
     const total = sess.currentRoundOrder.length;
+    const reviewing = isReviewingPastQuestion();
+    const answerRecord = answerRecordAt(viewPos);
+    const isAnswered = !!answerRecord;
 
     el.roundBadge.textContent = `Vòng ${sess.round}`;
-    el.quizCurrent.textContent = sess.pos + 1;
+    el.quizCurrent.textContent = viewPos + 1;
     el.quizTotal.textContent = total;
     el.quizCat.textContent = q.category;
-    el.progressFill.style.width = `${(sess.pos / total) * 100}%`;
+    el.progressFill.style.width = `${(viewPos / total) * 100}%`;
     el.statScore.textContent = Math.max(0, sess.pos - sess.roundWrong.length);
     el.statSeen.textContent = sess.pos;
 
     el.cardQuestion.innerHTML = escapeHtml(q.question);
-    el.btnNext.disabled = true;
-    el.btnNext.textContent = sess.pos + 1 >= total ? "Hoàn tất vòng này" : "Câu tiếp theo";
+    if (reviewing) {
+      el.btnNext.disabled = false;
+      el.btnNext.textContent = viewPos + 1 < sess.pos ? "Câu đã làm tiếp theo" : "Quay lại câu hiện tại";
+    } else if (isAnswered) {
+      el.btnNext.disabled = false;
+      el.btnNext.textContent = sess.pos + 1 >= total ? "Hoàn tất vòng này" : "Câu tiếp theo";
+    } else {
+      el.btnNext.disabled = true;
+      el.btnNext.textContent = sess.pos + 1 >= total ? "Hoàn tất vòng này" : "Câu tiếp theo";
+    }
+    el.btnPrev.disabled = viewPos <= 0;
+    el.btnSkip.disabled = reviewing || isAnswered;
     closeQuizInlineEditor();
-    const canInlineEdit = !isMulti(q);
+    const canInlineEdit = !isMulti(q) && !reviewing && !isAnswered;
     el.btnEditCurrentQuestion.disabled = !canInlineEdit;
     if (canInlineEdit) el.btnEditCurrentQuestion.removeAttribute("title");
     else el.btnEditCurrentQuestion.setAttribute("title", "Câu nhiều đáp án đúng — sửa trực tiếp trong file JSON");
 
     resetNoteBox();
+    el.reviewInfo.hidden = true;
 
     const multi = isMulti(q);
     const correctSet = new Set(multi ? q.answer : [q.answer]);
@@ -916,15 +985,25 @@
       btn.className = "option";
       btn.type = "button";
       btn.innerHTML = `<span class="option-letter">${i + 1}</span><span>${escapeHtml(optText)}</span>`;
-      btn.addEventListener("click", () => handleAnswer(i, correctSet, q));
+      if (reviewing || isAnswered) {
+        btn.disabled = true;
+        if (correctSet.has(i)) btn.classList.add("is-correct");
+        if (answerRecord && answerRecord.selected === i && !answerRecord.correct) btn.classList.add("is-wrong");
+        if (answerRecord && answerRecord.selected === i) btn.classList.add("is-selected");
+      } else {
+        btn.addEventListener("click", () => handleAnswer(i, correctSet, q));
+      }
       el.cardOptions.appendChild(btn);
     });
+    if (reviewing) renderReviewInfo(q, answerRecord ? answerRecord.selected : null);
 
     renderMath(el.card);
     saveSession();
   }
 
   function handleAnswer(i, correctSet, q) {
+    if (isReviewingPastQuestion()) return;
+    if (answerRecordAt(sess.pos)) return;
     const optionBtns = Array.from(el.cardOptions.children);
     if (optionBtns[0].disabled) return;
 
@@ -940,11 +1019,13 @@
     } else {
       sess.roundWrong.push(sess.currentRoundOrder[sess.pos]);
     }
+    sess.answerHistory[sess.pos] = { selected: i, correct: wasCorrect };
     recordAnswerStat(subject.id, q.id, wasCorrect);
 
     el.statScore.textContent = (sess.pos + 1) - sess.roundWrong.length;
     el.statSeen.textContent = sess.pos + 1;
     el.btnNext.disabled = false;
+    el.btnSkip.disabled = true;
     closeQuizInlineEditor();
     el.btnEditCurrentQuestion.disabled = true;
 
@@ -953,20 +1034,50 @@
   }
 
   function skipQuestion() {
+    if (el.btnSkip.disabled) return;
     const optionBtns = Array.from(el.cardOptions.children);
     if (!optionBtns[0] || !optionBtns[0].disabled) {
       const q = currentQuestion();
       sess.roundWrong.push(sess.currentRoundOrder[sess.pos]);
+      sess.answerHistory[sess.pos] = { selected: -1, correct: false };
       recordAnswerStat(subject.id, q.id, false);
     }
     advance();
   }
 
+  el.btnPrev.addEventListener("click", () => {
+    if (!sess) return;
+    const viewPos = currentViewPos();
+    if (viewPos <= 0) return;
+    const prevPos = viewPos - 1;
+    if (prevPos < sess.pos) {
+      sess.reviewMode = true;
+      sess.reviewPos = prevPos;
+    } else {
+      sess.reviewMode = false;
+      sess.reviewPos = null;
+    }
+    renderQuestion();
+  });
   el.btnSkip.addEventListener("click", skipQuestion);
   el.btnNext.addEventListener("click", advance);
 
   function advance() {
+    if (isReviewingPastQuestion()) {
+      const nextReviewPos = currentViewPos() + 1;
+      if (nextReviewPos < sess.pos) {
+        sess.reviewMode = true;
+        sess.reviewPos = nextReviewPos;
+      } else {
+        sess.reviewMode = false;
+        sess.reviewPos = null;
+      }
+      renderQuestion();
+      return;
+    }
     sess.pos++;
+    sess.reviewMode = false;
+    sess.reviewPos = null;
     if (sess.pos < sess.currentRoundOrder.length) {
       renderQuestion();
     } else if (sess.roundWrong.length === 0) {
@@ -1041,6 +1152,9 @@
     sess.currentRoundOrder = nextPool;
     sess.pos = 0;
     sess.roundWrong = [];
+    sess.answerHistory = new Array(nextPool.length).fill(null);
+    sess.reviewMode = false;
+    sess.reviewPos = null;
   }
 
   el.btnNextRound.addEventListener("click", () => {
