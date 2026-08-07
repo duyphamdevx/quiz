@@ -11,6 +11,7 @@
   const WAIT_ENTER_KEY = "boDeQuiz.waitForEnter.v1";
 
   const REVIEW_PAGE_SIZE = 20;
+  const MANAGE_PAGE_SIZE = 300; // số câu hiển thị mỗi lần bấm "Xem thêm" ở danh sách quản lý câu hỏi
 
   // ---------- State ----------
   let library = [];          // [{id, name, count, addedAt}]
@@ -653,7 +654,7 @@
   }
 
   function renderManagePage() {
-    const slice = subject.questions.slice(manageShown, manageShown + REVIEW_PAGE_SIZE);
+    const slice = subject.questions.slice(manageShown, manageShown + MANAGE_PAGE_SIZE);
     const frag = document.createDocumentFragment();
     slice.forEach((q) => {
       const multi = isMulti(q);
