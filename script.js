@@ -613,6 +613,45 @@
     if (subject.questions.length) renderManagePage();
   }
 
+  function setManageSingleAnswer(q, idx) {
+    q.answer = idx;
+    persistSubjectQuestions();
+  }
+  function toggleManageMultiAnswer(q, idx) {
+    const set = new Set(q.answer);
+    if (set.has(idx)) {
+      if (set.size <= 1) return false; // luôn phải còn ít nhất 1 đáp án đúng
+      set.delete(idx);
+    } else {
+      set.add(idx);
+    }
+    q.answer = Array.from(set).sort((a, b) => a - b);
+    persistSubjectQuestions();
+    return true;
+  }
+
+  function renderManageOptionsGrid(container, q, multi) {
+    container.innerHTML = "";
+    const correctSet = new Set(multi ? q.answer : [q.answer]);
+    q.options.forEach((optText, i) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "manage-opt" + (multi ? " is-multi" : "") + (correctSet.has(i) ? " is-correct" : "");
+      btn.innerHTML = `<span class="manage-opt-mark">${correctSet.has(i) ? "✓" : ""}</span><span class="manage-opt-text">${escapeHtml(optText)}</span>`;
+      btn.addEventListener("click", () => {
+        if (multi) {
+          if (!toggleManageMultiAnswer(q, i)) return;
+        } else {
+          if (q.answer === i) return;
+          setManageSingleAnswer(q, i);
+        }
+        renderManageOptionsGrid(container, q, multi);
+      });
+      container.appendChild(btn);
+    });
+    renderMath(container);
+  }
+
   function renderManagePage() {
     const slice = subject.questions.slice(manageShown, manageShown + REVIEW_PAGE_SIZE);
     const frag = document.createDocumentFragment();
@@ -621,15 +660,21 @@
       const div = document.createElement("div");
       div.className = "manage-item";
       div.innerHTML = `
-        <div class="manage-item-main">
-          <p class="manage-item-cat">${escapeHtml(q.category)}</p>
-          <p class="manage-item-q">${escapeHtml(q.question)}</p>
+        <div class="manage-item-top">
+          <div class="manage-item-main">
+            <p class="manage-item-cat">${escapeHtml(q.category)}${multi ? " · nhiều đáp án đúng" : ""}</p>
+            <p class="manage-item-q">${escapeHtml(q.question)}</p>
+          </div>
+          <div class="manage-item-actions">
+            <button class="btn-edit" ${multi ? "disabled title=\"Câu nhiều đáp án đúng — sửa nội dung trực tiếp trong file JSON\"" : ""}>Sửa</button>
+            <button class="btn-del">Xoá</button>
+          </div>
         </div>
-        <div class="manage-item-actions">
-          <button class="btn-edit" ${multi ? "disabled title=\"Câu nhiều đáp án đúng — sửa trực tiếp trong file JSON\"" : ""}>Sửa</button>
-          <button class="btn-del">Xoá</button>
-        </div>
+        <div class="manage-options-grid"></div>
       `;
+      const optionsGrid = div.querySelector(".manage-options-grid");
+      renderManageOptionsGrid(optionsGrid, q, multi);
+
       div.querySelector(".btn-edit").addEventListener("click", () => { if (!multi) openEditor(q); });
       div.querySelector(".btn-del").addEventListener("click", () => {
         if (confirm("Xoá câu hỏi này? Ghi chú và thống kê của câu này cũng sẽ không còn dùng được.")) {
