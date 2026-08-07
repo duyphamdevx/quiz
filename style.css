@@ -282,6 +282,14 @@ input.field-control { cursor: text; }
   color: var(--ink); margin: 0 0 22px;
 }
 
+.quiz-inline-edit { margin: -8px 0 18px; }
+.quiz-inline-edit-panel {
+  margin-top: 10px; padding: 14px;
+  border: 1px dashed var(--line); border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.quiz-inline-edit-panel .setup-error { margin: 0 0 12px; }
+
 .card-options { display: flex; flex-direction: column; gap: 9px; }
 .option {
   display: flex; align-items: center; gap: 12px; text-align: left; width: 100%;

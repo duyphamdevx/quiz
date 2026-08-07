@@ -53,6 +53,7 @@ Khi thêm/sửa câu hỏi thủ công trong app (mục 4), mỗi ô — câu h�
 - **Xuất/nhập dữ liệu** — nút "⭱ Xuất dữ liệu" tải về một file JSON chứa toàn bộ môn học, ghi chú, thống kê, lịch sử thi của bạn để backup hoặc chuyển sang máy khác; "⭳ Nhập dữ liệu" nạp lại file đó (môn trùng tên sẽ được thêm bản mới, không ghi đè môn đang có).
 - **Dán nhanh câu hỏi từ JSON** — trong màn "Thêm câu hỏi mới", bấm "📋 Dán nhanh từ JSON", dán một object JSON đúng định dạng (`question`, `options`, `answer`...) là app tự điền vào form để bạn xem lại và lưu; dán cả một **mảng** nhiều câu sẽ thêm hàng loạt luôn, không cần review từng câu.
 - **Thêm / sửa / xoá câu hỏi thủ công ngay trong app** — nút "✎ Thêm / sửa / xoá câu hỏi thủ công" ở màn hình cấu hình môn, không cần đụng vào file JSON. Sửa nội dung không làm mất ghi chú/thống kê đã có của câu đó (vì id câu hỏi giữ nguyên). Câu hỏi có nhiều đáp án đúng (dạng mảng trong JSON) chỉ xoá được qua giao diện, muốn sửa nội dung phải sửa trực tiếp trong file JSON để tránh vô tình làm mất bớt đáp án đúng.
+- **Sửa nhanh câu hỏi hiện tại ngay lúc đang làm bài** — trong màn câu hỏi luyện tập, bấm "Sửa câu hỏi hiện tại" ngay dưới câu hỏi để chỉnh nội dung/đáp án/đáp án đúng rồi lưu tại chỗ, không thoát phiên học.
 - Tự lưu phiên đang học dở, kể cả đang ở giữa vòng.
 
 ## 4. Thêm môn học mới

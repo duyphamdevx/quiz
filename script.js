@@ -23,6 +23,9 @@
   let statsRows = [];
   let statsShown = 0;
   let noteState = { qId: null };
+  let quizEditingQuestionId = null;
+  let quizEditOptions = [];
+  let quizEditCorrectIndex = 0;
 
   // ---------- DOM ----------
   const $ = (id) => document.getElementById(id);
@@ -67,6 +70,10 @@
     quizCurrent: $("quizCurrent"), quizTotal: $("quizTotal"), quizCat: $("quizCat"),
     progressFill: $("progressFill"),
     card: $("card"), cardQuestion: $("cardQuestion"), cardOptions: $("cardOptions"),
+    btnEditCurrentQuestion: $("btnEditCurrentQuestion"), quizInlineEditPanel: $("quizInlineEditPanel"),
+    quizEditQuestion: $("quizEditQuestion"), quizEditOptionsList: $("quizEditOptionsList"),
+    btnQuizEditAddOption: $("btnQuizEditAddOption"), quizInlineEditError: $("quizInlineEditError"),
+    btnCancelCurrentQuestionEdit: $("btnCancelCurrentQuestionEdit"), btnSaveCurrentQuestionEdit: $("btnSaveCurrentQuestionEdit"),
     noteBox: $("noteBox"), noteDisplay: $("noteDisplay"), noteText: $("noteText"),
     btnEditNote: $("btnEditNote"), btnAddNote: $("btnAddNote"),
     noteEdit: $("noteEdit"), noteTextarea: $("noteTextarea"),
@@ -791,6 +798,89 @@
 
   el.btnEditorBack.addEventListener("click", () => showScreen("manage"));
 
+  function setQuizInlineEditError(msg) {
+    if (!msg) { el.quizInlineEditError.hidden = true; el.quizInlineEditError.textContent = ""; return; }
+    el.quizInlineEditError.hidden = false;
+    el.quizInlineEditError.textContent = msg;
+  }
+
+  function closeQuizInlineEditor() {
+    quizEditingQuestionId = null;
+    quizEditOptions = [];
+    quizEditCorrectIndex = 0;
+    el.quizInlineEditPanel.hidden = true;
+    setQuizInlineEditError("");
+  }
+
+  function renderQuizInlineEditOptions() {
+    el.quizEditOptionsList.innerHTML = "";
+    quizEditOptions.forEach((text, i) => {
+      const row = document.createElement("div");
+      row.className = "edit-option-row";
+      row.innerHTML = `
+        <div class="edit-option-row-top">
+          <input type="radio" name="quizInlineCorrectAnswer" ${i === quizEditCorrectIndex ? "checked" : ""}>
+          <input type="text" class="field-control edit-option-text" value="${escapeHtml(text)}" placeholder="Đáp án ${i + 1}">
+          <button type="button" class="edit-option-remove" ${quizEditOptions.length <= 2 ? "disabled" : ""}>✕</button>
+        </div>
+      `;
+      row.querySelector('input[type="radio"]').addEventListener("change", () => { quizEditCorrectIndex = i; });
+      row.querySelector(".edit-option-text").addEventListener("input", (e) => { quizEditOptions[i] = e.target.value; });
+      row.querySelector(".edit-option-remove").addEventListener("click", () => {
+        if (quizEditOptions.length <= 2) return;
+        quizEditOptions.splice(i, 1);
+        if (quizEditCorrectIndex >= quizEditOptions.length) quizEditCorrectIndex = quizEditOptions.length - 1;
+        else if (quizEditCorrectIndex > i) quizEditCorrectIndex--;
+        renderQuizInlineEditOptions();
+      });
+      el.quizEditOptionsList.appendChild(row);
+    });
+  }
+
+  el.btnEditCurrentQuestion.addEventListener("click", () => {
+    if (!sess || !subject || !el.btnNext.disabled) return;
+    const q = currentQuestion();
+    if (!q || isMulti(q)) return;
+    quizEditingQuestionId = q.id;
+    el.quizEditQuestion.value = q.question || "";
+    quizEditOptions = Array.isArray(q.options) ? q.options.slice() : ["", ""];
+    quizEditCorrectIndex = typeof q.answer === "number" ? q.answer : 0;
+    setQuizInlineEditError("");
+    renderQuizInlineEditOptions();
+    el.quizInlineEditPanel.hidden = false;
+  });
+
+  el.btnQuizEditAddOption.addEventListener("click", () => {
+    quizEditOptions.push("");
+    renderQuizInlineEditOptions();
+  });
+  el.btnCancelCurrentQuestionEdit.addEventListener("click", closeQuizInlineEditor);
+  el.btnSaveCurrentQuestionEdit.addEventListener("click", () => {
+    if (!sess || !subject || !quizEditingQuestionId) return;
+    const questionText = el.quizEditQuestion.value.trim();
+    const options = quizEditOptions.map((t) => t.trim());
+
+    if (!questionText) { setQuizInlineEditError("Chưa nhập nội dung câu hỏi."); return; }
+    if (options.length < 2) { setQuizInlineEditError("Cần ít nhất 2 đáp án."); return; }
+    if (options.some((t) => !t)) { setQuizInlineEditError("Mỗi đáp án cần có nội dung (không để trống)."); return; }
+    if (quizEditCorrectIndex < 0 || quizEditCorrectIndex >= options.length) {
+      setQuizInlineEditError("Đáp án đúng không hợp lệ.");
+      return;
+    }
+
+    const currentIndex = sess.currentRoundOrder[sess.pos];
+    const q = subject.questions[currentIndex];
+    if (!q || q.id !== quizEditingQuestionId) {
+      setQuizInlineEditError("Không tìm thấy câu hỏi hiện tại để lưu.");
+      return;
+    }
+
+    subject.questions[currentIndex] = { ...q, question: questionText, options, answer: quizEditCorrectIndex };
+    persistSubjectQuestions();
+    closeQuizInlineEditor();
+    renderQuestion();
+  });
+
   // ---------- PRACTICE quiz (round loop) ----------
   function currentQuestion() { return subject.questions[sess.currentRoundOrder[sess.pos]]; }
 
@@ -809,6 +899,11 @@
     el.cardQuestion.innerHTML = escapeHtml(q.question);
     el.btnNext.disabled = true;
     el.btnNext.textContent = sess.pos + 1 >= total ? "Hoàn tất vòng này" : "Câu tiếp theo";
+    closeQuizInlineEditor();
+    const canInlineEdit = !isMulti(q);
+    el.btnEditCurrentQuestion.disabled = !canInlineEdit;
+    if (canInlineEdit) el.btnEditCurrentQuestion.removeAttribute("title");
+    else el.btnEditCurrentQuestion.setAttribute("title", "Câu nhiều đáp án đúng — sửa trực tiếp trong file JSON");
 
     resetNoteBox();
 
@@ -850,6 +945,8 @@
     el.statScore.textContent = (sess.pos + 1) - sess.roundWrong.length;
     el.statSeen.textContent = sess.pos + 1;
     el.btnNext.disabled = false;
+    closeQuizInlineEditor();
+    el.btnEditCurrentQuestion.disabled = true;
 
     showNoteBox(q);
     saveSession();

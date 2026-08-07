@@ -233,6 +233,23 @@
         <div class="deck-shadow deck-shadow-1"></div>
         <div class="card" id="card">
           <p class="card-question" id="cardQuestion">Câu hỏi sẽ hiện ở đây</p>
+          <div class="quiz-inline-edit">
+            <button type="button" class="note-link" id="btnEditCurrentQuestion">Sửa câu hỏi hiện tại</button>
+            <div class="quiz-inline-edit-panel" id="quizInlineEditPanel" hidden>
+              <div class="field editor-field">
+                <label class="field-label" for="quizEditQuestion">Câu hỏi</label>
+                <textarea id="quizEditQuestion" class="note-textarea" rows="3" placeholder="Nội dung câu hỏi..."></textarea>
+              </div>
+              <p class="field-label" style="margin-bottom:10px;">Đáp án — chọn nút tròn cho đáp án đúng</p>
+              <div id="quizEditOptionsList" class="edit-options-list"></div>
+              <button type="button" class="btn-secondary btn-sm" id="btnQuizEditAddOption" style="margin:10px 0 16px;">+ Thêm đáp án</button>
+              <p class="setup-error" id="quizInlineEditError" hidden></p>
+              <div class="note-edit-actions">
+                <button type="button" class="btn-secondary btn-sm" id="btnCancelCurrentQuestionEdit">Huỷ</button>
+                <button type="button" class="btn-primary btn-sm" id="btnSaveCurrentQuestionEdit">Lưu câu hỏi</button>
+              </div>
+            </div>
+          </div>
           <div class="card-options" id="cardOptions"></div>
 
           <div class="note-box" id="noteBox" hidden>
