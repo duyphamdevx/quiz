@@ -10,8 +10,7 @@
   const examHistoryKey = (id) => `boDeQuiz.examhistory.${id}`;
   const WAIT_ENTER_KEY = "boDeQuiz.waitForEnter.v1";
 
-  const REVIEW_PAGE_SIZE = 300;
-  const MANAGE_PAGE_SIZE = 300; // số câu hiển thị mỗi lần bấm "Xem thêm" ở danh sách quản lý câu hỏi
+  const REVIEW_PAGE_SIZE = 20;
 
   // ---------- State ----------
   let library = [];          // [{id, name, count, addedAt}]
@@ -593,7 +592,6 @@
   el.btnStatsBack.addEventListener("click", () => showScreen("config"));
 
   // ---------- MANAGE screen (manual add / edit / delete questions) ----------
-  let manageShown = 0;
 
   function syncSubjectCount() {
     const meta = library.find((s) => s.id === subject.id);
@@ -607,9 +605,8 @@
 
   function openManage() {
     el.manageTitle.textContent = `Câu hỏi — ${subject.name}`;
-    manageShown = 0;
     el.manageList.innerHTML = "";
-    el.btnManageMore.hidden = subject.questions.length === 0;
+    el.btnManageMore.hidden = true;
     showScreen("manage");
     if (subject.questions.length) renderManagePage();
   }
@@ -654,9 +651,8 @@
   }
 
   function renderManagePage() {
-    const slice = subject.questions.slice(manageShown, manageShown + MANAGE_PAGE_SIZE);
     const frag = document.createDocumentFragment();
-    slice.forEach((q) => {
+    subject.questions.forEach((q) => {
       const multi = isMulti(q);
       const div = document.createElement("div");
       div.className = "manage-item";
@@ -687,8 +683,7 @@
       frag.appendChild(div);
     });
     el.manageList.appendChild(frag);
-    manageShown += slice.length;
-    el.btnManageMore.hidden = manageShown >= subject.questions.length;
+    el.btnManageMore.hidden = true;
     renderMath(el.manageList);
   }
 
