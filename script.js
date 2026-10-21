@@ -9,6 +9,7 @@
   const statsKey = (id) => `boDeQuiz.stats.${id}`;
   const examHistoryKey = (id) => `boDeQuiz.examhistory.${id}`;
   const WAIT_ENTER_KEY = "boDeQuiz.waitForEnter.v1";
+  const OVERLAP_PCT_KEY = "boDeQuiz.examOverlapPct.v1";
 
   const REVIEW_PAGE_SIZE = 20;
 
@@ -51,6 +52,8 @@
     btnStart: $("btnStart"),
     setupResume: $("setupResume"), resumeProgress: $("resumeProgress"), btnResume: $("btnResume"),
     examCategorySelect: $("examCategorySelect"), examCount: $("examCount"), examMinutes: $("examMinutes"),
+    examOverlapPct: $("examOverlapPct"), examOverlapNote: $("examOverlapNote"),
+    examOverlapPctResult: $("examOverlapPctResult"), btnExamRetrySame: $("btnExamRetrySame"),
     btnStartExam: $("btnStartExam"), btnOpenStats: $("btnOpenStats"), btnOpenManage: $("btnOpenManage"),
 
     screenStats: $("screenStats"), btnStatsBack: $("btnStatsBack"), statsTitle: $("statsTitle"),
@@ -156,6 +159,30 @@
   }
   function saveWaitForEnterSetting(val) { safeSet(WAIT_ENTER_KEY, val ? "1" : "0"); }
   function waitForEnterEnabled() { return el.toggleWaitEnter ? el.toggleWaitEnter.checked : true; }
+
+  // ---------- Setting: % câu tối đa được trùng với lần thi gần nhất (mặc định 20) ----------
+  function clampPct(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return 20;
+    return Math.max(0, Math.min(100, Math.round(n)));
+  }
+  function loadOverlapPct() {
+    const v = safeGet(OVERLAP_PCT_KEY);
+    return v === null ? 20 : clampPct(v);
+  }
+  function applyOverlapPct(v, source) {
+    const pct = clampPct(v);
+    safeSet(OVERLAP_PCT_KEY, String(pct));
+    if (el.examOverlapNote) el.examOverlapNote.textContent = pct;
+    // giữ hai ô nhập (màn cấu hình và màn kết quả) đồng bộ, không ghi đè ô đang gõ
+    if (el.examOverlapPct && source !== el.examOverlapPct) el.examOverlapPct.value = pct;
+    if (el.examOverlapPctResult && source !== el.examOverlapPctResult) el.examOverlapPctResult.value = pct;
+    return pct;
+  }
+  function getOverlapPct() {
+    const raw = el.examOverlapPct ? el.examOverlapPct.value : "";
+    return raw === "" ? loadOverlapPct() : clampPct(raw);
+  }
 
   function normalizeQuestions(raw) {
     if (!Array.isArray(raw)) throw new Error("File JSON phải là một mảng câu hỏi.");
@@ -1266,20 +1293,43 @@
   el.btnRestart.addEventListener("click", () => { showScreen("library"); renderLibrary(); });
   el.btnRetrySame.addEventListener("click", () => openConfig(subject.id));
 
-  // ---------- EXAM mode (timed, ≤20% overlap with previous exam) ----------
-  function pickExamQuestions(pool, n, lastIdSet) {
-    const nonOverlap = pool.filter((i) => !lastIdSet.has(subject.questions[i].id));
-    const overlap = pool.filter((i) => lastIdSet.has(subject.questions[i].id));
-    const minNonOverlap = Math.ceil(n * 0.8);
-    let chosen = shuffle(nonOverlap).slice(0, Math.min(minNonOverlap, nonOverlap.length));
-    const remaining = n - chosen.length;
-    chosen = chosen.concat(shuffle(overlap).slice(0, Math.min(remaining, overlap.length)));
-    if (chosen.length < n) {
-      const used = new Set(chosen);
-      const leftover = shuffle(pool.filter((i) => !used.has(i)));
-      chosen = chosen.concat(leftover.slice(0, n - chosen.length));
+  // ---------- EXAM mode (timed, giới hạn % câu trùng với lần thi gần nhất) ----------
+  // overlapPct là mức TRẦN: số câu trùng không vượt quá floor(n * pct / 100) khi ngân hàng
+  // đủ câu mới. Nếu không đủ câu mới để lấp đầy đề thì buộc phải lấy thêm câu trùng.
+  function pickExamQuestions(pool, n, lastIdSet, overlapPct) {
+    const maxOverlap = Math.floor(n * clampPct(overlapPct) / 100);
+    const chosen = [];
+    const skippedOverlap = [];
+    let overlapCount = 0;
+    for (const idx of shuffle(pool)) {
+      if (chosen.length >= n) break;
+      if (lastIdSet.has(subject.questions[idx].id)) {
+        if (overlapCount < maxOverlap) { chosen.push(idx); overlapCount++; }
+        else skippedOverlap.push(idx);
+      } else {
+        chosen.push(idx);
+      }
+    }
+    // Hết câu mới mà vẫn thiếu: bất đắc dĩ lấy thêm câu trùng cho đủ số câu.
+    for (const idx of skippedOverlap) {
+      if (chosen.length >= n) break;
+      chosen.push(idx);
     }
     return shuffle(chosen);
+  }
+
+  function beginExam(category, order, minutes) {
+    const optionOrders = order.map((qIdx) => shuffle(subject.questions[qIdx].options.map((_, i) => i)));
+    examSess = {
+      category, order, pos: 0,
+      answers: new Array(order.length).fill(-1),
+      durationSec: minutes * 60,
+      endsAt: Date.now() + minutes * 60 * 1000,
+      optionOrders,
+    };
+    startExamTimer();
+    showScreen("exam");
+    renderExamQuestion();
   }
 
   function startExamWithParams(category, n, minutes) {
@@ -1293,18 +1343,8 @@
     const lastExam = history.length ? history[history.length - 1] : null;
     const lastIds = new Set(lastExam ? lastExam.questionIds : []);
 
-    const order = pickExamQuestions(pool, n, lastIds);
-    const optionOrders = order.map((qIdx) => shuffle(subject.questions[qIdx].options.map((_, i) => i)));
-    examSess = {
-      category, order, pos: 0,
-      answers: new Array(order.length).fill(-1),
-      durationSec: minutes * 60,
-      endsAt: Date.now() + minutes * 60 * 1000,
-      optionOrders,
-    };
-    startExamTimer();
-    showScreen("exam");
-    renderExamQuestion();
+    const order = pickExamQuestions(pool, n, lastIds, getOverlapPct());
+    beginExam(category, order, minutes);
   }
 
   el.btnStartExam.addEventListener("click", () => {
@@ -1433,6 +1473,19 @@
 
   el.btnExamRetry.addEventListener("click", () => {
     startExamWithParams(examSess.category, examSess.order.length, examSess.durationSec / 60);
+  });
+  // Làm lại đúng bộ câu hỏi vừa thi, từ đầu (xáo lại thứ tự câu và đáp án, tính giờ lại).
+  el.btnExamRetrySame.addEventListener("click", () => {
+    if (!examSess) return;
+    beginExam(examSess.category, shuffle(examSess.order.slice()), examSess.durationSec / 60);
+  });
+
+  // Ô "trùng tối đa (%)": lưu lại và đồng bộ giữa màn cấu hình và màn kết quả
+  applyOverlapPct(loadOverlapPct());
+  [el.examOverlapPct, el.examOverlapPctResult].forEach((inp) => {
+    if (!inp) return;
+    inp.addEventListener("input", () => { if (inp.value !== "") applyOverlapPct(inp.value, inp); });
+    inp.addEventListener("change", () => applyOverlapPct(inp.value === "" ? loadOverlapPct() : inp.value));
   });
   el.btnExamBack.addEventListener("click", () => { showScreen("library"); renderLibrary(); });
 

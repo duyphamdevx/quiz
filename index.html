@@ -131,8 +131,12 @@
             <label class="field-label">Thời gian (phút)</label>
             <input type="number" id="examMinutes" class="field-control" min="1" value="15">
           </div>
+          <div class="field">
+            <label class="field-label">Trùng tối đa (%)</label>
+            <input type="number" id="examOverlapPct" class="field-control" min="0" max="100" value="20">
+          </div>
         </div>
-        <p class="exam-note">Tối đa 20% số câu sẽ trùng với lần thi gần nhất của môn này (nếu ngân hàng câu hỏi đủ lớn) — không có phản hồi đúng/sai trong lúc thi, chỉ chấm điểm khi nộp bài.</p>
+        <p class="exam-note">Tối đa <b id="examOverlapNote">20</b>% số câu sẽ trùng với lần thi gần nhất của môn này (nếu ngân hàng câu hỏi đủ lớn) — không có phản hồi đúng/sai trong lúc thi, chỉ chấm điểm khi nộp bài.</p>
         <button class="btn-primary btn-start" id="btnStartExam">Bắt đầu thi</button>
       </div>
 
@@ -352,8 +356,14 @@
       <h1 class="result-score" id="examResultScore">0/0</h1>
       <p class="result-sub" id="examResultSub"></p>
       <div class="result-actions">
-        <button class="btn-primary" id="btnExamRetry">Thi lại (đề mới)</button>
+        <button class="btn-primary" id="btnExamRetrySame">Làm lại đúng bộ đề này</button>
+        <button class="btn-secondary" id="btnExamRetry">Thi lại (đề mới)</button>
         <button class="btn-secondary" id="btnExamBack">Về danh sách môn</button>
+      </div>
+      <div class="exam-overlap-inline">
+        <label for="examOverlapPctResult">Đề mới: trùng tối đa</label>
+        <input type="number" id="examOverlapPctResult" class="field-control" min="0" max="100" value="20">
+        <span>% so với đề vừa làm</span>
       </div>
       <div class="review-list" id="examReviewList"></div>
       <button class="btn-ghost" id="btnExamReviewMore" hidden>Xem thêm câu sai</button>

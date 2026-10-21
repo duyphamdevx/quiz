@@ -288,7 +288,7 @@ input.field-control { cursor: text; }
 
 .card-question {
   font-family: var(--f-display); font-weight: 600; font-size: 20px; line-height: 1.45;
-  color: var(--ink); margin: 0 0 22px;
+  color: var(--ink); margin: 0 0 22px; white-space: pre-wrap;
 }
 
 .quiz-inline-edit { margin: -8px 0 18px; }
@@ -361,6 +361,12 @@ input.field-control { cursor: text; }
 .result-score { font-family: var(--f-display); font-size: 62px; color: var(--ink); margin: 0 0 10px; font-weight: 600; }
 .result-sub { color: var(--ink-soft); font-size: 14.5px; margin: 0 0 30px; }
 .result-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 22px; }
+
+.exam-overlap-inline {
+  display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;
+  font-size: 13px; color: var(--ink-soft); margin: -6px 0 22px;
+}
+.exam-overlap-inline input.field-control { width: 70px; padding: 6px 8px; text-align: center; }
 
 .review-list { text-align: left; margin-top: 26px; display: flex; flex-direction: column; gap: 12px; }
 .review-item {
