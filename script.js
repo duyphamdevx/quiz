@@ -10,6 +10,11 @@
   const examHistoryKey = (id) => `boDeQuiz.examhistory.${id}`;
   const WAIT_ENTER_KEY = "boDeQuiz.waitForEnter.v1";
   const OVERLAP_PCT_KEY = "boDeQuiz.examOverlapPct.v1";
+  const PRACTICE_OVERLAP_KEY = "boDeQuiz.practiceOverlapPct.v1";
+  const practiceLastKey = (id) => `boDeQuiz.practicelast.${id}`;
+  const pickHistoryKey = (id) => `boDeQuiz.pickhistory.${id}`;
+  const PRACTICE_PICK_KEY = "boDeQuiz.practicePick.v1";
+  const EXAM_PICK_KEY = "boDeQuiz.examPick.v1";
 
   const REVIEW_PAGE_SIZE = 20;
 
@@ -54,6 +59,13 @@
     examCategorySelect: $("examCategorySelect"), examCount: $("examCount"), examMinutes: $("examMinutes"),
     examOverlapPct: $("examOverlapPct"), examOverlapNote: $("examOverlapNote"),
     examOverlapPctResult: $("examOverlapPctResult"), btnExamRetrySame: $("btnExamRetrySame"),
+    practiceOverlapPct: $("practiceOverlapPct"), practiceOverlapNote: $("practiceOverlapNote"),
+    practiceOverlapPctResult: $("practiceOverlapPctResult"), btnPracticeNewSet: $("btnPracticeNewSet"),
+    practicePickSelect: $("practicePickSelect"), examPickSelect: $("examPickSelect"),
+    practiceOverlapField: $("practiceOverlapField"), examOverlapField: $("examOverlapField"),
+    practiceNoteFresh: $("practiceNoteFresh"), practiceNoteRandom: $("practiceNoteRandom"),
+    examNoteFresh: $("examNoteFresh"), examNoteRandom: $("examNoteRandom"),
+    practiceOverlapInline: $("practiceOverlapInline"), examOverlapInline: $("examOverlapInline"),
     btnStartExam: $("btnStartExam"), btnOpenStats: $("btnOpenStats"), btnOpenManage: $("btnOpenManage"),
 
     screenStats: $("screenStats"), btnStatsBack: $("btnStatsBack"), statsTitle: $("statsTitle"),
@@ -160,28 +172,87 @@
   function saveWaitForEnterSetting(val) { safeSet(WAIT_ENTER_KEY, val ? "1" : "0"); }
   function waitForEnterEnabled() { return el.toggleWaitEnter ? el.toggleWaitEnter.checked : true; }
 
-  // ---------- Setting: % câu tối đa được trùng với lần thi gần nhất (mặc định 20) ----------
+  // ---------- Setting: % câu tối đa được trùng với lần trước (thi thử và luyện tập, mỗi bên một giá trị) ----------
   function clampPct(v) {
     const n = Number(v);
     if (!Number.isFinite(n)) return 20;
     return Math.max(0, Math.min(100, Math.round(n)));
   }
-  function loadOverlapPct() {
-    const v = safeGet(OVERLAP_PCT_KEY);
-    return v === null ? 20 : clampPct(v);
+  // inputs: các ô nhập được giữ đồng bộ với nhau; ô đầu tiên là nguồn đọc giá trị.
+  function createOverlapSetting(storageKey, inputs, noteEl) {
+    const load = () => { const v = safeGet(storageKey); return v === null ? 20 : clampPct(v); };
+    const apply = (v, source) => {
+      const pct = clampPct(v);
+      safeSet(storageKey, String(pct));
+      if (noteEl) noteEl.textContent = pct;
+      inputs.forEach((inp) => { if (inp && inp !== source) inp.value = pct; });
+      return pct;
+    };
+    const get = () => {
+      const raw = inputs[0] ? inputs[0].value : "";
+      return raw === "" ? load() : clampPct(raw);
+    };
+    const bind = () => {
+      apply(load());
+      inputs.forEach((inp) => {
+        if (!inp) return;
+        inp.addEventListener("input", () => { if (inp.value !== "") apply(inp.value, inp); });
+        inp.addEventListener("change", () => apply(inp.value === "" ? load() : inp.value));
+      });
+    };
+    return { load, apply, get, bind };
   }
-  function applyOverlapPct(v, source) {
-    const pct = clampPct(v);
-    safeSet(OVERLAP_PCT_KEY, String(pct));
-    if (el.examOverlapNote) el.examOverlapNote.textContent = pct;
-    // giữ hai ô nhập (màn cấu hình và màn kết quả) đồng bộ, không ghi đè ô đang gõ
-    if (el.examOverlapPct && source !== el.examOverlapPct) el.examOverlapPct.value = pct;
-    if (el.examOverlapPctResult && source !== el.examOverlapPctResult) el.examOverlapPctResult.value = pct;
-    return pct;
+  const examOverlap = createOverlapSetting(OVERLAP_PCT_KEY, [el.examOverlapPct, el.examOverlapPctResult], el.examOverlapNote);
+  const practiceOverlap = createOverlapSetting(PRACTICE_OVERLAP_KEY, [el.practiceOverlapPct, el.practiceOverlapPctResult], el.practiceOverlapNote);
+
+  // ---------- Cách chọn câu: "fresh" (ưu tiên câu chưa gặp / gặp lâu nhất) hoặc "random" (giới hạn trùng %) ----------
+  function createPickSetting(storageKey, selectEl, randomEls, freshEls) {
+    const load = () => (safeGet(storageKey) === "random" ? "random" : "fresh");
+    const get = () => (selectEl ? (selectEl.value === "random" ? "random" : "fresh") : load());
+    const refresh = () => {
+      const random = get() === "random";
+      randomEls.forEach((e) => { if (e) e.hidden = !random; }); // chỉ hiện ô % khi chọn "Ngẫu nhiên"
+      freshEls.forEach((e) => { if (e) e.hidden = random; });
+    };
+    const bind = () => {
+      if (selectEl) {
+        selectEl.value = load();
+        selectEl.addEventListener("change", () => { safeSet(storageKey, get()); refresh(); });
+      }
+      refresh();
+    };
+    return { get, bind };
   }
-  function getOverlapPct() {
-    const raw = el.examOverlapPct ? el.examOverlapPct.value : "";
-    return raw === "" ? loadOverlapPct() : clampPct(raw);
+  const practicePick = createPickSetting(PRACTICE_PICK_KEY, el.practicePickSelect,
+    [el.practiceOverlapField, el.practiceNoteRandom, el.practiceOverlapInline], [el.practiceNoteFresh]);
+  const examPick = createPickSetting(EXAM_PICK_KEY, el.examPickSelect,
+    [el.examOverlapField, el.examNoteRandom, el.examOverlapInline], [el.examNoteFresh]);
+
+  // Lịch sử từng câu của một môn: seq tăng 1 mỗi lần bắt đầu một phiên (luyện tập hoặc thi),
+  // last[id] = seq của lần gần nhất câu đó được chọn. Chưa có trong last = chưa từng gặp.
+  function loadPickHistory(id) {
+    try {
+      const h = JSON.parse(safeGet(pickHistoryKey(id)) || "null");
+      if (h && typeof h.seq === "number" && h.last && typeof h.last === "object") return h;
+    } catch (e) {}
+    return { seq: 0, last: {} };
+  }
+  function recordPicked(setIdx) {
+    const h = loadPickHistory(subject.id);
+    h.seq++;
+    for (const i of setIdx) h.last[subject.questions[i].id] = h.seq;
+    safeSet(pickHistoryKey(subject.id), JSON.stringify(h));
+  }
+  // Sắp xếp các câu trong pool: chưa gặp trước, rồi tới câu gặp lâu nhất; cùng mức thì xáo ngẫu nhiên.
+  function rankByFreshness(pool) {
+    const h = loadPickHistory(subject.id);
+    const buckets = new Map();
+    for (const idx of pool) {
+      const seq = h.last[subject.questions[idx].id] || 0;
+      if (!buckets.has(seq)) buckets.set(seq, []);
+      buckets.get(seq).push(idx);
+    }
+    return Array.from(buckets.keys()).sort((a, b) => a - b).flatMap((k) => shuffle(buckets.get(k)));
   }
 
   function normalizeQuestions(raw) {
@@ -232,6 +303,8 @@
     safeRemove(sessionKey(id));
     safeRemove(statsKey(id));
     safeRemove(examHistoryKey(id));
+    safeRemove(practiceLastKey(id));
+    safeRemove(pickHistoryKey(id));
   }
 
   function getSubjectQuestions(id) {
@@ -437,6 +510,7 @@
         notes: loadNotes(s.id),
         stats: loadStats(s.id),
         examHistory: loadExamHistory(s.id),
+        pickHistory: loadPickHistory(s.id),
       };
     }
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -469,6 +543,7 @@
           safeSet(notesKey(id), JSON.stringify(entry.notes || {}));
           safeSet(statsKey(id), JSON.stringify(entry.stats || {}));
           safeSet(examHistoryKey(id), JSON.stringify(entry.examHistory || []));
+          if (entry.pickHistory) safeSet(pickHistoryKey(id), JSON.stringify(entry.pickHistory));
           library.push(meta);
           added++;
         }
@@ -553,21 +628,16 @@
     showScreen("config");
   }
 
-  el.btnStart.addEventListener("click", () => {
-    const category = el.categorySelect.value;
-    const mode = el.modeSelect.value;
-    let pool = subject.questions.map((_, i) => i);
-    if (category !== "__all__") pool = pool.filter((i) => subject.questions[i].category === category);
-    if (pool.length === 0) { setError("Chương này không có câu hỏi."); return; }
+  function loadPracticeLast(id) {
+    try { return JSON.parse(safeGet(practiceLastKey(id)) || "[]"); } catch (e) { return []; }
+  }
 
-    const countSel = el.countSelect.value;
-    let originalSet = mode === "shuffle" ? shuffle(pool) : pool.slice();
-    const n = countSel === "all" ? originalSet.length : Math.min(parseInt(countSel, 10), originalSet.length);
-    originalSet = originalSet.slice(0, n);
-
+  // Tạo phiên luyện tập mới từ một tập câu đã chọn (chỉ số trong subject.questions).
+  function beginPractice(category, mode, countSel, originalSet) {
     sess = {
-      category, mode, round: 1,
-      currentRoundOrder: originalSet,
+      category, mode, countSel, round: 1,
+      currentRoundOrder: originalSet.slice(),
+      originalSet: originalSet.slice(), // giữ lại để "Làm lại đúng bộ này"
       pos: 0,
       roundWrong: [],
       answerHistory: new Array(originalSet.length).fill(null),
@@ -577,9 +647,34 @@
       originalSetLength: originalSet.length,
       optionOrders: [],
     };
+    safeSet(practiceLastKey(subject.id), JSON.stringify(originalSet.map((i) => subject.questions[i].id)));
+    recordPicked(originalSet);
     saveSession();
     showScreen("quiz");
     renderQuestion();
+  }
+
+  // Chọn bộ câu mới, giới hạn số câu trùng với bộ luyện tập gần nhất theo "Trùng tối đa (%)".
+  function startPractice(category, mode, countSel) {
+    let pool = subject.questions.map((_, i) => i);
+    if (category !== "__all__") pool = pool.filter((i) => subject.questions[i].category === category);
+    if (pool.length === 0) { setError("Chương này không có câu hỏi."); return; }
+
+    const n = countSel === "all" ? pool.length : Math.min(parseInt(countSel, 10) || pool.length, pool.length);
+    let chosen;
+    if (practicePick.get() === "fresh") {
+      chosen = rankByFreshness(pool).slice(0, n);
+    } else {
+      const lastIds = new Set(loadPracticeLast(subject.id));
+      const candidates = mode === "shuffle" ? shuffle(pool) : pool.slice();
+      chosen = pickWithOverlapCap(candidates, n, lastIds, practiceOverlap.get());
+    }
+    chosen = mode === "shuffle" ? shuffle(chosen) : chosen.sort((x, y) => x - y);
+    beginPractice(category, mode, countSel, chosen);
+  }
+
+  el.btnStart.addEventListener("click", () => {
+    startPractice(el.categorySelect.value, el.modeSelect.value, el.countSelect.value);
   });
 
   // ---------- STATS screen ----------
@@ -1291,17 +1386,31 @@
   }
 
   el.btnRestart.addEventListener("click", () => { showScreen("library"); renderLibrary(); });
-  el.btnRetrySame.addEventListener("click", () => openConfig(subject.id));
+  // Làm lại đúng bộ câu vừa luyện, từ vòng 1 (điểm lần đầu tính lại từ đầu).
+  el.btnRetrySame.addEventListener("click", () => {
+    if (sess && Array.isArray(sess.originalSet) && sess.originalSet.length) {
+      const set = sess.mode === "shuffle" ? shuffle(sess.originalSet.slice()) : sess.originalSet.slice();
+      beginPractice(sess.category, sess.mode, sess.countSel || String(set.length), set);
+    } else {
+      openConfig(subject.id); // phiên cũ chưa lưu bộ câu: quay về màn cấu hình
+    }
+  });
+  // Bộ câu mới cùng chương/số câu/chế độ, áp dụng giới hạn trùng với bộ vừa làm.
+  el.btnPracticeNewSet.addEventListener("click", () => {
+    if (!sess) { openConfig(subject.id); return; }
+    startPractice(sess.category, sess.mode, sess.countSel || String(sess.originalSetLength));
+  });
 
   // ---------- EXAM mode (timed, giới hạn % câu trùng với lần thi gần nhất) ----------
   // overlapPct là mức TRẦN: số câu trùng không vượt quá floor(n * pct / 100) khi ngân hàng
-  // đủ câu mới. Nếu không đủ câu mới để lấp đầy đề thì buộc phải lấy thêm câu trùng.
-  function pickExamQuestions(pool, n, lastIdSet, overlapPct) {
+  // đủ câu mới. Nếu không đủ câu mới để lấp đầy thì buộc phải lấy thêm câu trùng.
+  // candidates: danh sách chỉ số câu theo thứ tự ưu tiên (đã xáo hoặc theo thứ tự gốc).
+  function pickWithOverlapCap(candidates, n, lastIdSet, overlapPct) {
     const maxOverlap = Math.floor(n * clampPct(overlapPct) / 100);
     const chosen = [];
     const skippedOverlap = [];
     let overlapCount = 0;
-    for (const idx of shuffle(pool)) {
+    for (const idx of candidates) {
       if (chosen.length >= n) break;
       if (lastIdSet.has(subject.questions[idx].id)) {
         if (overlapCount < maxOverlap) { chosen.push(idx); overlapCount++; }
@@ -1310,15 +1419,18 @@
         chosen.push(idx);
       }
     }
-    // Hết câu mới mà vẫn thiếu: bất đắc dĩ lấy thêm câu trùng cho đủ số câu.
     for (const idx of skippedOverlap) {
       if (chosen.length >= n) break;
       chosen.push(idx);
     }
-    return shuffle(chosen);
+    return chosen;
+  }
+  function pickExamQuestions(pool, n, lastIdSet, overlapPct) {
+    return shuffle(pickWithOverlapCap(shuffle(pool), n, lastIdSet, overlapPct));
   }
 
   function beginExam(category, order, minutes) {
+    recordPicked(order);
     const optionOrders = order.map((qIdx) => shuffle(subject.questions[qIdx].options.map((_, i) => i)));
     examSess = {
       category, order, pos: 0,
@@ -1339,11 +1451,15 @@
     n = Math.max(1, Math.min(n, pool.length));
     minutes = Math.max(1, minutes);
 
-    const history = loadExamHistory(subject.id);
-    const lastExam = history.length ? history[history.length - 1] : null;
-    const lastIds = new Set(lastExam ? lastExam.questionIds : []);
-
-    const order = pickExamQuestions(pool, n, lastIds, getOverlapPct());
+    let order;
+    if (examPick.get() === "fresh") {
+      order = shuffle(rankByFreshness(pool).slice(0, n));
+    } else {
+      const history = loadExamHistory(subject.id);
+      const lastExam = history.length ? history[history.length - 1] : null;
+      const lastIds = new Set(lastExam ? lastExam.questionIds : []);
+      order = pickExamQuestions(pool, n, lastIds, examOverlap.get());
+    }
     beginExam(category, order, minutes);
   }
 
@@ -1480,13 +1596,11 @@
     beginExam(examSess.category, shuffle(examSess.order.slice()), examSess.durationSec / 60);
   });
 
-  // Ô "trùng tối đa (%)": lưu lại và đồng bộ giữa màn cấu hình và màn kết quả
-  applyOverlapPct(loadOverlapPct());
-  [el.examOverlapPct, el.examOverlapPctResult].forEach((inp) => {
-    if (!inp) return;
-    inp.addEventListener("input", () => { if (inp.value !== "") applyOverlapPct(inp.value, inp); });
-    inp.addEventListener("change", () => applyOverlapPct(inp.value === "" ? loadOverlapPct() : inp.value));
-  });
+  examOverlap.bind();
+  practiceOverlap.bind();
+  examPick.bind();
+  practicePick.bind();
+
   el.btnExamBack.addEventListener("click", () => { showScreen("library"); renderLibrary(); });
 
   // ---------- Keyboard shortcuts (quiz / exam screens only) ----------

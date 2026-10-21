@@ -106,7 +106,20 @@
               <option value="order">Theo thứ tự</option>
             </select>
           </div>
+          <div class="field">
+            <label class="field-label">Cách chọn câu</label>
+            <select id="practicePickSelect" class="field-control">
+              <option value="fresh">Ưu tiên câu chưa gặp</option>
+              <option value="random">Ngẫu nhiên (giới hạn trùng)</option>
+            </select>
+          </div>
+          <div class="field" id="practiceOverlapField">
+            <label class="field-label">Trùng tối đa (%)</label>
+            <input type="number" id="practiceOverlapPct" class="field-control" min="0" max="100" value="20">
+          </div>
         </div>
+        <p class="exam-note" id="practiceNoteFresh">Ưu tiên các câu chưa từng gặp (tính chung cả luyện tập và thi thử của môn này), rồi tới câu gặp lâu nhất. Hết cả ngân hàng mới quay vòng lại.</p>
+        <p class="exam-note" id="practiceNoteRandom" hidden>Tối đa <b id="practiceOverlapNote">20</b>% số câu sẽ trùng với bộ luyện tập gần nhất của môn này (nếu ngân hàng câu hỏi đủ lớn). Nhập 0 để không trùng câu nào, 100 để không giới hạn.</p>
 
         <button class="btn-primary btn-start" id="btnStart">Bắt đầu vòng 1</button>
 
@@ -132,11 +145,19 @@
             <input type="number" id="examMinutes" class="field-control" min="1" value="15">
           </div>
           <div class="field">
+            <label class="field-label">Cách chọn câu</label>
+            <select id="examPickSelect" class="field-control">
+              <option value="fresh">Ưu tiên câu chưa gặp</option>
+              <option value="random">Ngẫu nhiên (giới hạn trùng)</option>
+            </select>
+          </div>
+          <div class="field" id="examOverlapField">
             <label class="field-label">Trùng tối đa (%)</label>
             <input type="number" id="examOverlapPct" class="field-control" min="0" max="100" value="20">
           </div>
         </div>
-        <p class="exam-note">Tối đa <b id="examOverlapNote">20</b>% số câu sẽ trùng với lần thi gần nhất của môn này (nếu ngân hàng câu hỏi đủ lớn) — không có phản hồi đúng/sai trong lúc thi, chỉ chấm điểm khi nộp bài.</p>
+        <p class="exam-note" id="examNoteFresh">Ưu tiên các câu chưa từng gặp (tính chung cả luyện tập và thi thử của môn này), rồi tới câu gặp lâu nhất; hết cả ngân hàng mới quay vòng lại — không có phản hồi đúng/sai trong lúc thi, chỉ chấm điểm khi nộp bài.</p>
+        <p class="exam-note" id="examNoteRandom" hidden>Tối đa <b id="examOverlapNote">20</b>% số câu sẽ trùng với lần thi gần nhất của môn này (nếu ngân hàng câu hỏi đủ lớn) — không có phản hồi đúng/sai trong lúc thi, chỉ chấm điểm khi nộp bài.</p>
         <button class="btn-primary btn-start" id="btnStartExam">Bắt đầu thi</button>
       </div>
 
@@ -314,8 +335,14 @@
       <p class="result-sub" id="resultSub"></p>
 
       <div class="result-actions">
-        <button class="btn-primary" id="btnRetrySame">Làm lại bộ này</button>
+        <button class="btn-primary" id="btnRetrySame">Làm lại đúng bộ này</button>
+        <button class="btn-secondary" id="btnPracticeNewSet">Luyện bộ câu mới</button>
         <button class="btn-secondary" id="btnRestart">Học môn khác</button>
+      </div>
+      <div class="exam-overlap-inline" id="examOverlapInline">
+        <label for="practiceOverlapPctResult">Bộ mới: trùng tối đa</label>
+        <input type="number" id="practiceOverlapPctResult" class="field-control" min="0" max="100" value="20">
+        <span>% so với bộ vừa làm</span>
       </div>
     </div>
   </section>
@@ -360,7 +387,7 @@
         <button class="btn-secondary" id="btnExamRetry">Thi lại (đề mới)</button>
         <button class="btn-secondary" id="btnExamBack">Về danh sách môn</button>
       </div>
-      <div class="exam-overlap-inline">
+      <div class="exam-overlap-inline" id="practiceOverlapInline">
         <label for="examOverlapPctResult">Đề mới: trùng tối đa</label>
         <input type="number" id="examOverlapPctResult" class="field-control" min="0" max="100" value="20">
         <span>% so với đề vừa làm</span>
