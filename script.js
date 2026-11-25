@@ -509,6 +509,7 @@
         questions: getSubjectQuestions(s.id),
         notes: loadNotes(s.id),
         stats: loadStats(s.id),
+        session: loadSession(s.id),
         examHistory: loadExamHistory(s.id),
         pickHistory: loadPickHistory(s.id),
       };
@@ -544,6 +545,9 @@
           safeSet(statsKey(id), JSON.stringify(entry.stats || {}));
           safeSet(examHistoryKey(id), JSON.stringify(entry.examHistory || []));
           if (entry.pickHistory) safeSet(pickHistoryKey(id), JSON.stringify(entry.pickHistory));
+          if (Array.isArray(entry.session?.currentRoundOrder) && entry.session.currentRoundOrder.length) {
+            safeSet(sessionKey(id), JSON.stringify(normalizePracticeSession(entry.session)));
+          }
           library.push(meta);
           added++;
         }
