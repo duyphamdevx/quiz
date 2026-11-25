@@ -623,7 +623,7 @@
     const savedSess = loadSession(id);
     if (savedSess) {
       el.setupResume.hidden = false;
-      el.resumeProgress.textContent = `Vòng ${savedSess.round} — câu ${savedSess.pos + 1}/${savedSess.currentRoundOrder.length}`;
+      el.resumeProgress.textContent = `${practiceLabel(savedSess)} — câu ${savedSess.pos + 1}/${savedSess.currentRoundOrder.length}`;
       el.btnResume.onclick = () => { sess = normalizePracticeSession(savedSess); showScreen("quiz"); renderQuestion(); };
     } else {
       el.setupResume.hidden = true;
@@ -638,19 +638,23 @@
 
   // Tạo phiên luyện tập mới từ một tập câu đã chọn (chỉ số trong subject.questions).
   function beginPractice(category, mode, countSel, originalSet) {
+    const firstBatch = mode === "comprehensive" ? originalSet.slice(0, 10) : originalSet.slice();
     sess = {
       category, mode, countSel, round: 1,
-      currentRoundOrder: originalSet.slice(),
+      currentRoundOrder: firstBatch,
       originalSet: originalSet.slice(), // giữ lại để "Làm lại đúng bộ này"
       pos: 0,
       roundWrong: [],
-      answerHistory: new Array(originalSet.length).fill(null),
+      answerHistory: new Array(firstBatch.length).fill(null),
       reviewMode: false,
       reviewPos: null,
       firstRoundCorrectCount: 0,
       originalSetLength: originalSet.length,
       optionOrders: [],
     };
+    if (mode === "comprehensive") {
+      sess.batch = { phase: "new", offset: firstBatch.length, pending: [] };
+    }
     safeSet(practiceLastKey(subject.id), JSON.stringify(originalSet.map((i) => subject.questions[i].id)));
     recordPicked(originalSet);
     saveSession();
@@ -675,6 +679,18 @@
     }
     chosen = mode === "shuffle" ? shuffle(chosen) : chosen.sort((x, y) => x - y);
     beginPractice(category, mode, countSel, chosen);
+  }
+
+  $("btnComprehensive").addEventListener("click", () => {
+    if (!subject.questions.length) { alert("Môn này chưa có câu hỏi."); return; }
+    if (loadSession(subject.id) && !confirm("Bắt đầu ôn toàn môn và thay thế phiên đang học dở?")) return;
+    beginPractice("__all__", "comprehensive", "all", subject.questions.map((_, i) => i));
+  });
+
+  function practiceLabel(s) {
+    if (!s.batch) return `Vòng ${s.round}`;
+    const group = Math.ceil(s.batch.offset / 10);
+    return `Nhóm ${group}/${Math.ceil(s.originalSetLength / 10)} · ${s.batch.phase === "new" ? "Câu mới" : "Ôn câu sai"}`;
   }
 
   el.btnStart.addEventListener("click", () => {
@@ -1136,7 +1152,7 @@
     const answerRecord = answerRecordAt(viewPos);
     const isAnswered = !!answerRecord;
 
-    el.roundBadge.textContent = `Vòng ${sess.round}`;
+    el.roundBadge.textContent = practiceLabel(sess);
     el.quizCurrent.textContent = viewPos + 1;
     el.quizTotal.textContent = total;
     el.quizCat.textContent = q.category;
@@ -1209,7 +1225,7 @@
     if (!wasCorrect && clickedSlot !== -1) optionBtns[clickedSlot].classList.add("is-wrong");
 
     if (wasCorrect) {
-      if (sess.round === 1) sess.firstRoundCorrectCount++;
+      if (sess.batch ? sess.batch.phase === "new" : sess.round === 1) sess.firstRoundCorrectCount++;
     } else {
       sess.roundWrong.push(sess.currentRoundOrder[sess.pos]);
     }
@@ -1228,7 +1244,10 @@
       saveSession();
     } else {
       saveSession();
-      setTimeout(() => { if (!isReviewingPastQuestion()) advance(); }, 350);
+      const answeredSession = sess;
+      setTimeout(() => {
+        if (sess === answeredSession && !isReviewingPastQuestion() && !$("screenQuiz").hidden && sess.pos < sess.currentRoundOrder.length) advance();
+      }, 350);
     }
   }
 
@@ -1286,6 +1305,8 @@
     sess.reviewPos = null;
     if (sess.pos < sess.currentRoundOrder.length) {
       renderQuestion();
+    } else if (sess.batch) {
+      advanceComprehensive();
     } else if (sess.roundWrong.length === 0) {
       finishMastered();
     } else {
@@ -1354,6 +1375,31 @@
 
   function advanceToNextRound() {
     const nextPool = sess.mode === "shuffle" ? shuffle(sess.roundWrong) : sess.roundWrong.slice();
+    resetRound(nextPool);
+  }
+
+  function advanceComprehensive() {
+    const batch = sess.batch;
+    if (batch.phase === "new") batch.pending.push(...sess.roundWrong);
+    else batch.pending = sess.roundWrong.slice();
+
+    const moreNew = batch.offset < sess.originalSetLength;
+    if (batch.pending.length && (batch.phase === "new" || !moreNew)) {
+      batch.phase = "review";
+      resetRound(batch.pending.slice());
+    } else if (moreNew) {
+      const next = sess.originalSet.slice(batch.offset, batch.offset + 10);
+      batch.offset += next.length;
+      batch.phase = "new";
+      resetRound(next);
+    } else {
+      finishMastered();
+      return;
+    }
+    renderQuestion();
+  }
+
+  function resetRound(nextPool) {
     sess.round++;
     sess.currentRoundOrder = nextPool;
     sess.pos = 0;
@@ -1386,6 +1432,10 @@
     const pct = sess.originalSetLength ? Math.round((sess.firstRoundCorrectCount / sess.originalSetLength) * 100) : 0;
     el.resultScore.textContent = `${sess.firstRoundCorrectCount}/${sess.originalSetLength}`;
     el.resultSub.textContent = `Điểm ngay lần đầu: ${pct}% — hoàn thành sau ${sess.round} vòng.`;
+    if (sess.batch) {
+      el.resultScore.textContent = `${sess.originalSetLength}/${sess.originalSetLength}`;
+      el.resultSub.textContent = `Đã trả lời đúng toàn bộ môn. Đúng ngay lần đầu: ${sess.firstRoundCorrectCount}/${sess.originalSetLength} (${pct}%).`;
+    }
     showScreen("result");
   }
 
